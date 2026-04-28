@@ -1,0 +1,25 @@
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/venv/
+backend/.env
+backend/.vscode/
+backend/*.db
+
+# Flutter apps
+apps/operator/build/
+apps/operator/.dart_tool/
+apps/operator/pubspec.lock
+apps/technician/build/
+apps/technician/.dart_tool/
+apps/technician/pubspec.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
