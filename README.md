@@ -1,77 +1,159 @@
 # PlantOS
 
-Sistema distribuído de ordens de serviço para plantas industriais, desenvolvido como projeto integrador da disciplina de Laboratório de Desenvolvimento de Aplicações Móveis e Distribuídas — PUC Minas, 1º Semestre 2026.
+Sistema distribuído de **ordens de serviço para plantas industriais**, desenvolvido como projeto integrador da disciplina de Laboratório de Desenvolvimento de Aplicações Móveis e Distribuídas — PUC Minas, 1º Semestre 2026.
 
 ---
 
 ## Sobre o projeto
 
-O PlantOS permite que operadores de uma planta industrial abram ordens de serviço (OS) relatando falhas ou necessidades de manutenção, e que técnicos recebam, aceitem e executem essas ordens de forma assíncrona, registrando os materiais utilizados e emitindo um laudo ao final.
+O **PlantOS** (*Plant* + *OS*) digitaliza o fluxo de abertura, acompanhamento e conclusão de ordens de serviço em ambientes industriais. Operadores de chão de fábrica registram falhas ou necessidades de manutenção em equipamentos, e técnicos de manutenção recebem, avaliam e executam essas ordens de forma assíncrona, documentando os materiais utilizados e emitindo um laudo técnico ao final.
 
-A arquitetura é orientada a eventos (EDA): toda mudança de estado de uma OS gera um evento publicado no RabbitMQ, que notifica os aplicativos interessados sem necessidade de polling contínuo.
+A arquitetura é **orientada a eventos (EDA)**: toda mudança de estado de uma OS gera um evento publicado no RabbitMQ, que notifica os aplicativos interessados sem necessidade de polling contínuo. Isso garante comunicação em tempo real entre os dois perfis de usuário.
+
+### Problema resolvido
+
+Em plantas industriais, a comunicação entre operadores e equipes de manutenção é frequentemente feita de forma verbal ou em quadros físicos — métodos sujeitos a perda de informação, atrasos e falta de rastreabilidade. O PlantOS elimina esses problemas com rastreabilidade completa, notificações automáticas e registro estruturado de cada intervenção.
 
 ---
 
 ## Perfis de usuário
 
-| Perfil | Descrição |
-|---|---|
-| **Operador** | Abre OS, acompanha o status em tempo real, recebe notificação de conclusão |
-| **Técnico** | Recebe novas OS, aceita ou recusa, registra materiais usados, conclui com laudo |
+| Perfil | Papel | Funcionalidades principais |
+|---|---|---|
+| **Operador** (Cliente) | Profissional da operação da planta | Abre OS com título, descrição, setor, equipamento e prioridade; acompanha status em tempo real; recebe notificação de aceite/recusa/conclusão; consulta laudo e materiais |
+| **Técnico** (Prestador) | Profissional de manutenção | Recebe novas OS em tempo real; aceita ou recusa; registra materiais utilizados; conclui com laudo técnico; consulta histórico de OS executadas |
+
+---
+
+## Ciclo de vida de uma OS
+
+```
+  ┌────────┐    aceitar    ┌────────┐   iniciar   ┌──────────────┐   concluir   ┌───────────┐
+  │ ABERTA │──────────────►│ ACEITA │────────────►│ EM ANDAMENTO │─────────────►│ CONCLUÍDA │
+  └────┬───┘               └────────┘             └──────────────┘              └───────────┘
+       │   recusar    ┌──────────┐
+       └─────────────►│ RECUSADA │
+                      └──────────┘
+```
 
 ---
 
 ## Arquitetura
 
 ```
-Operador (Flutter)
-    │  REST
-    ▼
-Backend Flask ──── RabbitMQ ────► Técnico (Flutter)
-    │                                    │
-    ▼                                    ▼
- SQLite                          Aceita / Conclui OS
-    │                                    │
-    └──────────── RabbitMQ ◄─────────────┘
-                     │
-                     ▼
-             Operador notificado
+┌──────────────────┐                          ┌──────────────────┐
+│  App Operador    │                          │  App Técnico     │
+│  (Flutter/Dart)  │                          │  (Flutter/Dart)  │
+└────────┬─────────┘                          └────────┬─────────┘
+         │ REST (HTTP/JSON)                            │ REST (HTTP/JSON)
+         ▼                                             ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    Backend Flask (Python)                        │
+│                 API REST + Event Publisher                       │
+├──────────────────────────┬───────────────────────────────────────┤
+│       SQLite             │           RabbitMQ (AMQP)            │
+│    (Persistência)        │          (Mensageria/MOM)            │
+└──────────────────────────┴───────────────────────────────────────┘
+                                       │
+                          Eventos assíncronos
+                          ▼               ▼
+                   App Técnico     App Operador
+                   (notificado)    (notificado)
 ```
 
-**Componentes:**
-- `apps/operator` — App Flutter do operador
-- `apps/technician` — App Flutter do técnico
-- `backend` — API REST em Flask (Python)
-- RabbitMQ — Middleware orientado a mensagens (MOM)
-- SQLite — Banco de dados local
+**Protocolos de comunicação:**
+- **Apps ↔ Backend:** HTTP/REST com payloads JSON
+- **Backend → Apps (eventos):** AMQP via RabbitMQ (publish/subscribe)
+- **Backend ↔ Banco:** SQLite (acesso local embutido)
 
 ---
 
 ## Fluxo de eventos
 
-| Evento | Produzido quando | Consumidor |
+| Evento | Produzido quando | Produtor | Consumidor | Fila/Exchange |
+|---|---|---|---|---|
+| `os.criada` | Operador abre nova OS | Backend (via endpoint POST /os) | App do técnico | `plantos.events` |
+| `os.aceita` | Técnico aceita a OS | Backend (via endpoint PATCH) | App do operador | `plantos.events` |
+| `os.recusada` | Técnico recusa a OS | Backend (via endpoint PATCH) | App do operador | `plantos.events` |
+| `os.em_andamento` | Técnico inicia a execução | Backend (via endpoint PATCH) | App do operador | `plantos.events` |
+| `os.concluida` | Técnico conclui com laudo | Backend (via endpoint PATCH) | App do operador | `plantos.events` |
+
+---
+
+## Endpoints da API REST
+
+| Método | Rota | Descrição |
 |---|---|---|
-| `os.criada` | Operador abre nova OS | App do técnico |
-| `os.aceita` | Técnico aceita a OS | App do operador |
-| `os.recusada` | Técnico recusa a OS | App do operador |
-| `os.concluida` | Técnico conclui com laudo | App do operador |
+| `POST` | `/os` | Criar nova ordem de serviço |
+| `GET` | `/os` | Listar todas as OS (filtros opcionais: `?status=aberta`) |
+| `GET` | `/os/<id>` | Consultar OS por ID |
+| `PATCH` | `/os/<id>/aceitar` | Técnico aceita a OS |
+| `PATCH` | `/os/<id>/recusar` | Técnico recusa a OS |
+| `PATCH` | `/os/<id>/concluir` | Técnico conclui a OS com laudo |
+| `POST` | `/os/<id>/materiais` | Registrar materiais utilizados na OS |
+| `GET` | `/os/<id>/materiais` | Listar materiais de uma OS |
+
+---
+
+## Modelo de dados
+
+### Ordem de Serviço
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | INTEGER (PK) | Identificador único |
+| `titulo` | TEXT | Título resumido da falha |
+| `descricao` | TEXT | Descrição detalhada |
+| `setor` | TEXT | Setor ou área da planta |
+| `equipamento` | TEXT | Equipamento afetado |
+| `prioridade` | TEXT | baixa, média, alta, crítica |
+| `status` | TEXT | aberta, aceita, em_andamento, concluída, recusada |
+| `operador_id` | TEXT | Identificador do operador |
+| `tecnico_id` | TEXT | Identificador do técnico (após aceite) |
+| `laudo` | TEXT | Laudo técnico (após conclusão) |
+| `criado_em` | DATETIME | Data/hora de criação |
+| `atualizado_em` | DATETIME | Data/hora da última atualização |
+
+### Material Utilizado
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | INTEGER (PK) | Identificador único |
+| `ordem_servico_id` | INTEGER (FK) | Referência à OS |
+| `nome` | TEXT | Nome do material/peça |
+| `quantidade` | INTEGER | Quantidade utilizada |
 
 ---
 
 ## Estrutura do repositório
 
 ```
-plantos/
-├── backend/          # API REST Flask + publisher/consumer RabbitMQ
+PlantOS-LAMD/
+├── backend/              # API REST Flask + publisher/consumer RabbitMQ
+│   ├── app.py            # Entry point
+│   ├── requirements.txt  # Dependências Python
+│   └── app/
+│       ├── models/       # Modelos de dados (SQLAlchemy / SQLite)
+│       ├── routes/       # Blueprints com endpoints REST
+│       ├── services/     # Lógica de negócio
+│       └── messaging/    # Publisher e consumer RabbitMQ
 ├── apps/
-│   ├── operator/     # Flutter — app do operador
-│   └── technician/   # Flutter — app do técnico
-├── infra/            # docker-compose.yml (RabbitMQ)
-├── docs/             # Entregas por sprint
-│   ├── sprint1/
-│   ├── sprint2/
-│   ├── sprint3/
-│   └── sprint4/
+│   ├── operator/         # Flutter — app do operador (cliente)
+│   │   └── lib/
+│   │       ├── models/   # Modelos de dados Dart
+│   │       ├── screens/  # Telas do app
+│   │       └── services/ # Comunicação com API e eventos
+│   └── technician/       # Flutter — app do técnico (prestador)
+│       └── lib/
+│           ├── models/
+│           ├── screens/
+│           └── services/
+├── infra/                # docker-compose.yml (RabbitMQ)
+├── docs/                 # Entregas por sprint
+│   ├── sprint1/          # Proposta, diagrama, backend REST
+│   ├── sprint2/          # Integração MOM
+│   ├── sprint3/          # App Flutter — Operador
+│   └── sprint4/          # App Flutter — Técnico + entrega final
 └── README.md
 ```
 
@@ -101,7 +183,13 @@ Painel de administração disponível em `http://localhost:15672` (guest / guest
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
+# Linux/macOS:
+source .venv/bin/activate
+
+# Windows:
+.venv\Scripts\activate
+
 pip install -r requirements.txt
 python app.py
 ```
@@ -126,29 +214,30 @@ flutter run
 
 ## Sprints
 
-| Sprint | Foco | Prazo |
-|---|---|---|
-| Sprint 1 | Proposta + Backend REST | 11/05/2026 |
-| Sprint 2 | Integração RabbitMQ (MOM) | 25/05/2026 |
-| Sprint 3 | App Flutter — Operador | 15/06/2026 |
-| Sprint 4 | App Flutter — Técnico + entrega final | 03/07/2026 |
+| Sprint | Foco | Entregas | Prazo |
+|---|---|---|---|
+| Sprint 1 | Proposta + Backend REST | Proposta de domínio, diagrama de arquitetura, endpoints CRUD, coleção Postman | 11/05/2026 |
+| Sprint 2 | Integração RabbitMQ (MOM) | Publisher/consumer, eventos assíncronos, documentação de eventos | 25/05/2026 |
+| Sprint 3 | App Flutter — Operador | App funcional (3+ telas), integração REST, atualização assíncrona de estado | 15/06/2026 |
+| Sprint 4 | App Flutter — Técnico + Entrega final | App prestador, fluxo ponta a ponta, screencast, relatório técnico final | 03/07/2026 |
 
 ---
 
 ## Tecnologias
 
-| Camada | Tecnologia |
-|---|---|
-| Apps móveis | Flutter / Dart |
-| Backend | Flask (Python) |
-| Banco de dados | SQLite |
-| Mensageria | RabbitMQ |
-| Infraestrutura | Docker Compose |
+| Camada | Tecnologia | Versão |
+|---|---|---|
+| Apps móveis | Flutter / Dart | 3.10+ / 3.x |
+| Backend | Flask (Python) | 3.11+ |
+| Banco de dados | SQLite | 3.x |
+| Mensageria (MOM) | RabbitMQ | 3.12 |
+| Infraestrutura | Docker Compose | 3.8+ |
 
 ---
 
 ## Disciplina
 
-**Lab. de Desenvolvimento de Aplicações Móveis e Distribuídas**
-Engenharia de Software — 5º Período — PUC Minas
-Professores: Cleiton Silva Tavares e Cristiano de Macedo Neto
+**Lab. de Desenvolvimento de Aplicações Móveis e Distribuídas**  
+Engenharia de Software — 5º Período — PUC Minas  
+Professores: Cleiton Silva Tavares e Cristiano de Macedo Neto  
+Semestre: 1º Semestre 2026
