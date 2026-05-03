@@ -12,6 +12,7 @@ Proposta de domínio, diagrama de arquitetura e backend REST funcional.
 |---|---|---|
 | Proposta de Domínio | [proposta-de-dominio.md](proposta-de-dominio.md) | Descrição do domínio, justificativa, perfis de usuário e funcionalidades |
 | Documento de Arquitetura | [arquitetura.md](arquitetura.md) | Diagramas C4/Mermaid, componentes, protocolos, eventos, schema do banco |
+| Banco de Dados | [banco-de-dados.md](banco-de-dados.md) | Schema SQLite documentado, diagrama ER, regras de integridade, exemplos SQL |
 | Backend REST | `../../backend/` | API Flask funcional com endpoints CRUD |
 | Coleção de Testes | *(a ser adicionada)* | Arquivo Postman com todos os endpoints documentados |
 
