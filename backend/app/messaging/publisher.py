@@ -9,42 +9,51 @@ def get_connection():
     connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
     return connection
 
-def setup_exchange():
+def setup_queues():
+    """Declara as filas duráveis e seus bindings."""
     connection = get_connection()
     channel = connection.channel()
-    # Usando Direct Exchange para roteamento 1-a-1 com as filas dinâmicas dos usuários
     channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='direct', durable=True)
+
+    # Fila do operador (recebe eventos de aceite, recusa, andamento e conclusão)
+    channel.queue_declare(queue='fila.operador', durable=True)
+    for key in ['os.aceita', 'os.recusada', 'os.em_andamento', 'os.concluida']:
+        channel.queue_bind(exchange=EXCHANGE_NAME, queue='fila.operador', routing_key=key)
+
+    # Fila do técnico (recebe eventos de criação de OS)
+    channel.queue_declare(queue='fila.tecnico', durable=True)
+    channel.queue_bind(exchange=EXCHANGE_NAME, queue='fila.tecnico', routing_key='os.criada')
+
     connection.close()
 
-def publish_event(user_id, event_type, payload):
+
+def publish_event(routing_key, payload):
     """
-    Publica um evento para um usuário específico.
-    user_id: string identificando o usuário (ex: 'op_123', 'tec_456')
+    Publica um evento na exchange plantos.events.
+    routing_key: tipo do evento (ex: 'os.criada', 'os.aceita')
+    payload: dicionário com os dados do evento
     """
     connection = get_connection()
     channel = connection.channel()
-    
-    # Garante que a exchange existe
+
     channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='direct', durable=True)
-    
+
+    from datetime import datetime
     message = {
-        'event_type': event_type,
-        'payload': payload
+        'evento': routing_key,
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'dados': payload
     }
-    
-    # No AMQP Direct, a routing_key deve corresponder EXATAMENTE à binding_key
-    # usada pelo app cliente ao criar sua fila temporária.
-    routing_key = str(user_id)
-    
+
     channel.basic_publish(
         exchange=EXCHANGE_NAME,
         routing_key=routing_key,
         body=json.dumps(message),
         properties=pika.BasicProperties(
-            delivery_mode=1,  # Não precisa ser persistente na fila, pois filas são efémeras (auto-delete)
+            delivery_mode=2,  # Mensagem persistente
             content_type='application/json'
         )
     )
-    
-    print(f" [x] Sent {event_type} to routing_key {routing_key}")
+
+    print(f" [x] Published {routing_key}")
     connection.close()

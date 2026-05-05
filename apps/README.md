@@ -1,3 +1,8 @@
 # apps/
 
-Projetos Flutter do operador e técnico com screens, services e models.
+Aplicativos móveis Flutter (Dart) do PlantOS:
+
+- **operator/** — App do Operador (cliente que abre OS)
+- **technician/** — App do Técnico (prestador que executa OS)
+
+Ambos seguem Clean Architecture (models → services → screens) e são offline-first com SQLite local + outbox pattern.

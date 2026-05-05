@@ -50,9 +50,9 @@ graph TB
     TEC --- DB_TEC
     API --> DB
     API --> PUB
-    PUB -->|AMQP publicar| MQ
-    MQ -.->|Assinatura AMQP direta| OP
-    MQ -.->|Assinatura AMQP direta| TEC
+    PUB -->|AMQP publish| MQ
+    MQ -.->|AMQP subscribe| OP
+    MQ -.->|AMQP subscribe| TEC
 ```
 
 ---
@@ -62,9 +62,9 @@ graph TB
 ```mermaid
 graph LR
     subgraph "Backend Flask"
-        subgraph "Rotas (Blueprints)"
-            R1[/os — CRUD OS/]
-            R2[/os/:id/materiais/]
+        subgraph "Rotas - Blueprints"
+            R1["/os — CRUD OS"]
+            R2["/os/:id/materiais"]
         end
 
         subgraph "Serviços"
@@ -110,29 +110,29 @@ sequenceDiagram
     Op->>API: POST /os (título, descrição, setor, equipamento, prioridade)
     API->>API: Persiste OS no SQLite (status: aberta)
     API-->>Op: 201 Created
-    Op->>Op: Marca outbox como enviado; atualiza cache local
-    API->>MQ: Publish evento "os.criada"
-    MQ-->>Tec: Entrega mensagem "os.criada" (via fila técnico)
+    Op->>Op: Marca outbox como enviado e atualiza cache local
+    API->>MQ: Publish evento os.criada
+    MQ-->>Tec: Entrega mensagem os.criada via fila.tecnico
     Tec->>Tec: Persiste OS no SQLite local (cache)
 
     Note over Op,Tec: Fluxo 2 — Aceite da OS
     Tec->>Tec: Persiste aceite no SQLite local (outbox: pendente)
     Tec->>API: PATCH /os/:id/aceitar (tecnico_id)
-    API->>API: Atualiza status para "aceita"
+    API->>API: Atualiza status para aceita
     API-->>Tec: 200 OK
-    Tec->>Tec: Marca outbox como enviado; atualiza cache local
-    API->>MQ: Publish evento "os.aceita"
-    MQ-->>Op: Entrega mensagem "os.aceita" (via fila operador)
+    Tec->>Tec: Marca outbox como enviado e atualiza cache local
+    API->>MQ: Publish evento os.aceita
+    MQ-->>Op: Entrega mensagem os.aceita via fila.operador
     Op->>Op: Atualiza cache local
 
     Note over Op,Tec: Fluxo 3 — Início da execução
     Tec->>Tec: Persiste início no SQLite local (outbox: pendente)
     Tec->>API: PATCH /os/:id/iniciar (tecnico_id)
-    API->>API: Atualiza status para "em_andamento"
+    API->>API: Atualiza status para em_andamento
     API-->>Tec: 200 OK
-    Tec->>Tec: Marca outbox como enviado; atualiza cache local
-    API->>MQ: Publish evento "os.em_andamento"
-    MQ-->>Op: Entrega mensagem "os.em_andamento" (via fila operador)
+    Tec->>Tec: Marca outbox como enviado e atualiza cache local
+    API->>MQ: Publish evento os.em_andamento
+    MQ-->>Op: Entrega mensagem os.em_andamento via fila.operador
     Op->>Op: Atualiza cache local
 
     Note over Op,Tec: Fluxo 4 — Registro de materiais e conclusão
@@ -140,11 +140,11 @@ sequenceDiagram
     Tec->>API: POST /os/:id/materiais (nome, quantidade)
     API-->>Tec: 201 Created
     Tec->>API: PATCH /os/:id/concluir (laudo)
-    API->>API: Atualiza status para "concluída"
+    API->>API: Atualiza status para concluída
     API-->>Tec: 200 OK
-    Tec->>Tec: Marca outbox como enviado; atualiza cache local
-    API->>MQ: Publish evento "os.concluida"
-    MQ-->>Op: Entrega mensagem "os.concluida" (via fila operador)
+    Tec->>Tec: Marca outbox como enviado e atualiza cache local
+    API->>MQ: Publish evento os.concluida
+    MQ-->>Op: Entrega mensagem os.concluida via fila.operador
     Op->>Op: Atualiza cache local
 ```
 
@@ -159,22 +159,31 @@ sequenceDiagram
     participant API as Backend Flask
     participant MQ as RabbitMQ
 
-    Note over App,MQ: App detecta retorno de conectividade
+    Note over App,MQ: 1. App detecta retorno de conectividade
     App->>API: GET /os (sincronização de estado)
     API-->>App: Lista completa de OS atualizada
     App->>DB_L: Atualiza cache local com estado do servidor
 
-    Note over App,MQ: Drena a outbox local
-    App->>DB_L: Busca eventos com status = "pendente" (ordenados por criado_em)
-    loop Para cada evento pendente
+    Note over App,MQ: 2. Resolve conflitos (servidor vence)
+    App->>DB_L: Remove da outbox ações que já foram refletidas no servidor
+    App->>DB_L: Mantém apenas ações pendentes sobre OS ainda válidas
+
+    Note over App,MQ: 3. Drena a outbox local (ordenada por criado_em)
+    loop Para cada evento pendente na outbox
         App->>API: Envia requisição REST correspondente ao evento
-        API-->>App: 200 / 201
-        App->>DB_L: Marca evento como "enviado"
+        alt Sucesso 2xx
+            API-->>App: 200 / 201
+            App->>DB_L: Marca evento como enviado
+        else Conflito 409
+            API-->>App: 409 Conflict
+            App->>DB_L: Marca evento como descartado
+        end
     end
 
-    Note over App,MQ: Reassina fila AMQP
-    App->>MQ: Conecta AMQP e re-declara fila exclusiva
-    MQ-->>App: Confirmação de assinatura
+    Note over App,MQ: 4. Reassina fila AMQP
+    App->>MQ: Conecta AMQP e declara consumidor na fila
+    MQ-->>App: Entrega mensagens acumuladas
+    App->>App: Descarta mensagens anteriores ao timestamp do sync
     Note over App,MQ: App volta a receber eventos em tempo real
 ```
 
@@ -195,10 +204,10 @@ graph TB
     end
 
     subgraph "Servidor / Host Local"
-        subgraph "Podman"
-            RMQ[Contêiner RabbitMQ<br/>Porta 5672 AMQP — rede local<br/>Porta 15672 Painel Admin]
+        subgraph "Podman Compose"
+            RMQ[Contêiner RabbitMQ<br/>Porta 5672 AMQP<br/>Porta 15672 Painel Admin]
         end
-        FLASK[Processo Flask<br/>Porta 5000<br/>HTTP REST — rede local]
+        FLASK[Processo Flask<br/>Porta 5000<br/>HTTP REST]
         SQLITE[Arquivo plantos.db<br/>SQLite]
     end
 
@@ -212,9 +221,7 @@ graph TB
     FLASK --- SQLITE
 ```
 
-> **Nota de rede:** tanto a porta `5000` (Flask) quanto a porta `5672` (RabbitMQ AMQP) devem ser expostas na interface de rede local (`0.0.0.0`), e não apenas em `localhost`, para que os apps Flutter rodando em emuladores ou dispositivos físicos consigam alcançar o servidor.
-
-> **Podman:** o RabbitMQ é executado via Podman (substituto rootless do Docker). O comando de inicialização é `podman run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.12-management`. Não é necessário `podman-compose` para o escopo deste projeto.
+> **Nota de rede:** tanto a porta `5000` (Flask) quanto a porta `5672` (RabbitMQ AMQP) devem ser expostas na interface de rede local (`0.0.0.0`), para que os apps Flutter rodando em emuladores ou dispositivos físicos consigam alcançar o servidor.
 
 ---
 
@@ -240,36 +247,21 @@ graph TB
         SVC_API[ApiService<br/>REST + sync]
         SVC_MQ[AmqpService<br/>conexão + reconexão]
         SVC_SYNC[SyncService<br/>outbox + reconexão]
+        SVC_CONN[ConnectivityService<br/>detecção online/offline]
         MDL[Modelos<br/>Classes de Dados]
         DB_L[(SQLite Local<br/>cache + outbox)]
     end
 
     UI --> SVC_API
     UI --> SVC_MQ
-    SVC_API --> MDL
-    SVC_MQ --> MDL
+    SVC_CONN --> SVC_SYNC
     SVC_SYNC --> SVC_API
     SVC_SYNC --> DB_L
+    SVC_API --> MDL
+    SVC_MQ --> MDL
     SVC_API --> DB_L
     SVC_MQ --> DB_L
 ```
-
-**Estratégia de reconexão AMQP com backoff exponencial:**
-
-```
-ao detectar desconexão AMQP:
-  tentativa 1 → aguarda 2s  → reconecta
-  tentativa 2 → aguarda 4s  → reconecta
-  tentativa 3 → aguarda 8s  → reconecta
-  tentativa 4 → aguarda 16s → reconecta
-  tentativa 5 → aguarda 32s → reconecta
-  após 5 tentativas → notifica UI com indicador "offline"
-```
-
-Ao reconectar com sucesso:
-1. `SyncService` chama `GET /os` para atualizar o cache local
-2. `SyncService` drena a outbox (eventos `status = pendente`, ordenados por `criado_em`)
-3. `AmqpService` re-declara a fila exclusiva e reassina o consumidor
 
 ### 7.2 App Técnico (Flutter/Dart)
 
@@ -290,7 +282,7 @@ Mesma estratégia de reconexão, outbox e sync do App Operador.
 |---|---|
 | **Tecnologia** | Python 3.11+ / Flask |
 | **Arquitetura interna** | Modular por responsabilidade (routes, services, models, messaging) |
-| **Persistência** | SQLite via `sqlite3` nativo ou SQLAlchemy |
+| **Persistência** | SQLite via `sqlite3` nativo |
 | **Mensageria** | Biblioteca `pika` para conexão AMQP com RabbitMQ |
 | **Porta** | 5000 (HTTP, exposta em `0.0.0.0`) |
 
@@ -301,10 +293,11 @@ backend/
 ├── app.py                    # Ponto de entrada, inicializa Flask app
 ├── requirements.txt          # Dependências (flask, pika, etc.)
 └── app/
-    ├── __init__.py           # Factory do app Flask
+    ├── database.py           # Conexão com SQLite + init_db()
     ├── models/
     │   ├── __init__.py
-    │   └── ordem_servico.py  # Modelos de dados + acesso ao banco
+    │   ├── ordem_servico.py  # Modelo OrdemServico + acesso ao banco
+    │   └── material.py       # Modelo Material + acesso ao banco
     ├── routes/
     │   ├── __init__.py
     │   └── os_routes.py      # Blueprints com endpoints REST
@@ -322,38 +315,41 @@ backend/
 |---|---|
 | **Tecnologia** | RabbitMQ 3.12 com plugin Management |
 | **Protocolo** | AMQP 0-9-1 |
-| **Containerização** | Podman (rootless) |
-| **Portas** | 5672 (AMQP, exposta em `0.0.0.0`), 15672 (Management UI) |
+| **Containerização** | Podman Compose |
+| **Portas** | 5672 (AMQP), 15672 (Management UI) |
 | **Credenciais dev** | guest / guest |
-
-**Comando de inicialização:**
-
-```bash
-podman run -d \
-  --name rabbitmq \
-  -p 5672:5672 \
-  -p 15672:15672 \
-  rabbitmq:3.12-management
-```
 
 **Topologia de exchanges e filas:**
 
 ```mermaid
 graph LR
     subgraph "RabbitMQ"
-        EX[Exchange<br/>plantos.events<br/>tipo: direct]
-        Q1[Fila Dinâmica<br/>queue_op_{id}<br/>Binding: op_{id}<br/>Exclusive: true<br/>Auto-delete: true]
-        Q2[Fila Dinâmica<br/>queue_tec_{id}<br/>Binding: tec_{id}<br/>Exclusive: true<br/>Auto-delete: true]
+        EX[Exchange: plantos.events<br/>tipo: direct<br/>durable: true]
+        Q1[fila.operador<br/>durable: true]
+        Q2[fila.tecnico<br/>durable: true]
     end
 
-    PUB[Publicador Backend] -->|routing_key: op_{id} ou tec_{id}| EX
-    EX -->|op_{id}| Q1
-    EX -->|tec_{id}| Q2
+    PUB[Backend Flask] -->|routing_key variável| EX
+    EX -->|binding: os.aceita| Q1
+    EX -->|binding: os.recusada| Q1
+    EX -->|binding: os.em_andamento| Q1
+    EX -->|binding: os.concluida| Q1
+    EX -->|binding: os.criada| Q2
     Q1 --> C1[App Operador<br/>Consumidor]
     Q2 --> C2[App Técnico<br/>Consumidor]
 ```
 
-> **Sobre filas auto-delete:** mensagens publicadas enquanto o app está offline são perdidas na fila AMQP. Isso é mitigado pelo fluxo de reconexão: ao voltar online, o app faz `GET /os` para sincronizar o estado mais recente antes de reassinar o AMQP. A outbox local garante que ações feitas offline sejam enviadas ao servidor na ordem correta.
+**Decisão: filas duráveis com mensagens persistentes**
+
+Usamos filas **duráveis** com **mensagens persistentes** (delivery_mode=2). Isso garante que mensagens publicadas enquanto o app está offline **não são perdidas** — ficam armazenadas no RabbitMQ aguardando o consumidor reconectar.
+
+Ao reconectar, o app:
+1. Primeiro faz `GET /os` para obter o estado completo e atualizado do servidor
+2. Depois reconecta ao AMQP e consome as mensagens acumuladas
+3. **Descarta mensagens com timestamp anterior ao sync REST** (pois representam estados intermediários já superados)
+4. A partir daí, novas mensagens AMQP são processadas normalmente como notificações em tempo real
+
+> **Por que descartar as mensagens antigas?** Porque após um período offline longo, as mensagens na fila representam estados intermediários que já foram superados. O `GET /os` traz o estado final correto. Processar mensagens antigas causaria transições de UI desnecessárias.
 
 ### 7.5 SQLite Local nos Apps (Offline-First)
 
@@ -383,12 +379,21 @@ CREATE TABLE IF NOT EXISTS os_cache (
     sincronizado_em TEXT  -- timestamp da última sync com o servidor
 );
 
+-- Cache local de materiais
+CREATE TABLE IF NOT EXISTS material_cache (
+    id INTEGER PRIMARY KEY,
+    ordem_servico_id INTEGER NOT NULL,
+    nome TEXT NOT NULL,
+    quantidade INTEGER NOT NULL
+);
+
 -- Outbox: ações pendentes de envio ao backend
 CREATE TABLE IF NOT EXISTS outbox (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo TEXT NOT NULL,         -- ex: "criar_os", "aceitar_os", "concluir_os"
+    tipo TEXT NOT NULL,         -- ex: "criar_os", "aceitar_os", "iniciar_os", "concluir_os", "registrar_material"
     payload TEXT NOT NULL,      -- JSON com os dados da ação
-    status TEXT NOT NULL DEFAULT 'pendente',  -- pendente | enviado | erro
+    os_id INTEGER,             -- ID da OS relacionada (null para criação)
+    status TEXT NOT NULL DEFAULT 'pendente',  -- pendente | enviado | descartado | erro
     tentativas INTEGER DEFAULT 0,
     criado_em TEXT DEFAULT (datetime('now')),
     enviado_em TEXT
@@ -401,23 +406,92 @@ CREATE TABLE IF NOT EXISTS outbox (
 |---|---|
 | **Tecnologia** | SQLite 3.x |
 | **Arquivo** | `backend/plantos.db` (criado automaticamente) |
-| **Acesso** | Via `sqlite3` nativo do Python ou SQLAlchemy |
+| **Acesso** | Via `sqlite3` nativo do Python |
 | **Tabelas** | `ordem_servico`, `material` |
 
 ---
 
-## 8. Protocolos de Comunicação
+## 8. Estratégia Offline-First e Sincronização
 
-| Origem | Destino | Protocolo | Porta | Formato | Descrição |
-|---|---|---|---|---|---|
-| App Operador | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Operações CRUD sobre OS + sync ao reconectar |
-| App Técnico | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Aceite, recusa, início, conclusão + sync ao reconectar |
-| Backend Flask | RabbitMQ | AMQP 0-9-1 | 5672 | JSON | Publicação de eventos |
-| App Operador | RabbitMQ | AMQP 0-9-1 | 5672 | JSON | Assinatura direta de fila exclusiva |
-| App Técnico | RabbitMQ | AMQP 0-9-1 | 5672 | JSON | Assinatura direta de fila exclusiva |
-| Backend Flask | SQLite (servidor) | File I/O | — | SQL | Persistência de dados do servidor |
-| App Operador | SQLite (local) | File I/O | — | SQL | Cache offline + outbox de eventos |
-| App Técnico | SQLite (local) | File I/O | — | SQL | Cache offline + outbox de eventos |
+### 8.1 Princípio Fundamental
+
+> **Toda ação do usuário é gravada localmente PRIMEIRO, depois enviada ao servidor quando possível.**
+
+Isso permite que o sistema funcione normalmente sem conectividade por tempo indeterminado (dias, semanas ou meses).
+
+### 8.2 Detecção de Conectividade
+
+O app usa o pacote `connectivity_plus` para monitorar mudanças de rede. Adicionalmente, faz um health check HTTP periódico (`GET /os` com timeout de 5s) para confirmar que o backend está realmente acessível.
+
+```
+Estados de conectividade:
+  ONLINE   → REST + AMQP funcionando normalmente
+  OFFLINE  → Apenas SQLite local; ações vão para outbox
+```
+
+### 8.3 Fluxo de Reconexão (Sync-First Strategy)
+
+Quando o app detecta retorno de conectividade após um período offline:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PASSO 1: PULL — Sincronizar estado do servidor                 │
+│  GET /os → atualiza os_cache com o estado autoritativo          │
+│  (servidor sempre vence em caso de conflito)                    │
+├─────────────────────────────────────────────────────────────────┤
+│  PASSO 2: RECONCILE — Filtrar outbox                            │
+│  Para cada item pendente na outbox:                             │
+│    - Se a OS no servidor já passou do estado que a ação tenta   │
+│      aplicar → marca como "descartado" (conflito resolvido)     │
+│    - Se a ação ainda é válida → mantém como "pendente"          │
+├─────────────────────────────────────────────────────────────────┤
+│  PASSO 3: PUSH — Drenar outbox (em ordem cronológica)           │
+│  Para cada ação pendente (ORDER BY criado_em ASC):              │
+│    - Envia a requisição REST ao backend                         │
+│    - Se 2xx → marca como "enviado"                              │
+│    - Se 409 (conflito) → marca como "descartado"               │
+│    - Se 5xx ou timeout → mantém como "pendente", para e         │
+│      tenta na próxima rodada (preserva ordem)                   │
+├─────────────────────────────────────────────────────────────────┤
+│  PASSO 4: SUBSCRIBE — Reconectar AMQP                           │
+│  - Conecta ao RabbitMQ e consome a fila durável                 │
+│  - Descarta mensagens com timestamp anterior ao sync do Passo 1 │
+│  - Processa normalmente mensagens novas (atualiza cache + UI)   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 8.4 Estratégia de Reconexão AMQP (Backoff Exponencial)
+
+```
+Ao detectar desconexão AMQP:
+  tentativa 1 → aguarda 2s  → reconecta
+  tentativa 2 → aguarda 4s  → reconecta
+  tentativa 3 → aguarda 8s  → reconecta
+  tentativa 4 → aguarda 16s → reconecta
+  tentativa 5 → aguarda 32s → reconecta
+  após 5 tentativas → notifica UI com indicador "offline"
+  continua tentando a cada 60s em background
+```
+
+### 8.5 Regras de Conflito
+
+| Situação | Resolução |
+|---|---|
+| App tenta aceitar OS que já foi aceita por outro técnico | Backend retorna 409; outbox marca como descartado |
+| App tenta concluir OS que já foi concluída | Backend retorna 409; outbox marca como descartado |
+| App cria OS offline, servidor estava indisponível | Na reconexão, POST é enviado normalmente — sem conflito |
+| Múltiplas ações offline na mesma OS | Enviadas em ordem cronológica; backend valida cada transição |
+| Erro 5xx durante drain da outbox | Para o drain, tenta novamente na próxima rodada |
+
+### 8.6 Garantias do Sistema
+
+| Garantia | Mecanismo |
+|---|---|
+| Nenhuma ação do usuário é perdida | Outbox persiste em SQLite local |
+| Ordem de ações preservada | Campo `criado_em` na outbox + envio ordenado |
+| Estado consistente após reconexão | Sync-first (GET /os) antes de drenar outbox |
+| Sem duplicação de ações | Backend valida transições de estado (máquina de estados) |
+| Tolerância a offline prolongado | Filas AMQP duráveis + outbox local sem expiração |
 
 ---
 
@@ -427,11 +501,12 @@ CREATE TABLE IF NOT EXISTS outbox (
 
 - **Exchange:** `plantos.events` (type: `direct`, durable: true)
 - **Filas:**
-  - `fila.operador` — Recebe eventos destinados ao operador
-  - `fila.tecnico` — Recebe eventos destinados ao técnico
+  - `fila.operador` — durable: true — Recebe eventos destinados ao operador
+  - `fila.tecnico` — durable: true — Recebe eventos destinados ao técnico
 - **Bindings:**
   - `fila.tecnico` ← routing key `os.criada`
   - `fila.operador` ← routing keys `os.aceita`, `os.recusada`, `os.em_andamento`, `os.concluida`
+- **Mensagens:** delivery_mode=2 (persistente), content_type=application/json
 
 ### 9.2 Payloads dos Eventos
 
@@ -573,10 +648,16 @@ Response: 200 OK
   {
     "id": 1,
     "titulo": "Vazamento na válvula V-102",
-    "status": "aberta",
-    "prioridade": "alta",
+    "descricao": "Vazamento de óleo identificado...",
     "setor": "Caldeiras",
-    "criado_em": "2026-05-02T14:30:00Z"
+    "equipamento": "Válvula V-102",
+    "prioridade": "alta",
+    "status": "aberta",
+    "operador_id": "op-001",
+    "tecnico_id": null,
+    "laudo": null,
+    "criado_em": "2026-05-02T14:30:00Z",
+    "atualizado_em": "2026-05-02T14:30:00Z"
   }
 ]
 ```
@@ -621,6 +702,11 @@ Response: 200 OK
   "tecnico_id": "tec-003",
   "atualizado_em": "2026-05-02T14:35:00Z"
 }
+
+Response: 409 Conflict (se OS não está com status "aberta")
+{
+  "erro": "Transição inválida. Status atual: aceita. Esperado: aberta"
+}
 ```
 
 ### 10.5 Recusar OS
@@ -639,6 +725,11 @@ Response: 200 OK
   "id": 1,
   "status": "recusada",
   "atualizado_em": "2026-05-02T14:35:00Z"
+}
+
+Response: 409 Conflict (se OS não está com status "aberta")
+{
+  "erro": "Transição inválida. Status atual: aceita. Esperado: aberta"
 }
 ```
 
@@ -660,6 +751,11 @@ Response: 200 OK
   "tecnico_id": "tec-003",
   "atualizado_em": "2026-05-02T15:00:00Z"
 }
+
+Response: 409 Conflict (se OS não está com status "aceita")
+{
+  "erro": "Transição inválida. Status atual: aberta. Esperado: aceita"
+}
 ```
 
 ### 10.7 Concluir OS
@@ -680,6 +776,11 @@ Response: 200 OK
   "status": "concluida",
   "laudo": "Substituição da gaxeta...",
   "atualizado_em": "2026-05-02T17:00:00Z"
+}
+
+Response: 409 Conflict (se OS não está com status "em_andamento")
+{
+  "erro": "Transição inválida. Status atual: aceita. Esperado: em_andamento"
 }
 ```
 
@@ -711,8 +812,8 @@ GET /os/:id/materiais
 
 Response: 200 OK
 [
-  {"id": 1, "nome": "Gaxeta 3/4\"", "quantidade": 2},
-  {"id": 2, "nome": "Anel O-Ring", "quantidade": 4}
+  {"id": 1, "ordem_servico_id": 1, "nome": "Gaxeta 3/4\"", "quantidade": 2},
+  {"id": 2, "ordem_servico_id": 1, "nome": "Anel O-Ring", "quantidade": 4}
 ]
 ```
 
@@ -794,15 +895,25 @@ erDiagram
         text sincronizado_em
     }
 
+    MATERIAL_CACHE {
+        int id PK
+        int ordem_servico_id FK
+        text nome
+        int quantidade
+    }
+
     OUTBOX {
         int id PK
         text tipo
         text payload
+        int os_id
         text status
         int tentativas
         text criado_em
         text enviado_em
     }
+
+    OS_CACHE ||--o{ MATERIAL_CACHE : "contém"
 ```
 
 ---
@@ -815,16 +926,22 @@ stateDiagram-v2
     Aberta --> Aceita : Técnico aceita
     Aberta --> Recusada : Técnico recusa
     Aceita --> EmAndamento : Técnico inicia execução
-    EmAndamento --> Concluída : Técnico conclui com laudo
+    EmAndamento --> Concluida : Técnico conclui com laudo
     Recusada --> [*]
-    Concluída --> [*]
+    Concluida --> [*]
 ```
 
 **Regras de transição:**
-- Apenas OS com status `aberta` podem ser aceitas ou recusadas
-- Apenas OS com status `aceita` podem passar para `em_andamento`
-- Apenas OS com status `em_andamento` podem ser concluídas
-- Conclusão exige um laudo técnico preenchido
+
+| Transição | Pré-condição | Campos obrigatórios | Código HTTP se violada |
+|---|---|---|---|
+| aberta → aceita | status == aberta | tecnico_id | 409 |
+| aberta → recusada | status == aberta | tecnico_id | 409 |
+| aceita → em_andamento | status == aceita | tecnico_id | 409 |
+| em_andamento → concluida | status == em_andamento | tecnico_id, laudo | 409 |
+
+- O backend **valida** cada transição e retorna **409 Conflict** se a pré-condição não for atendida
+- Isso protege contra ações offline desatualizadas que tentam transições inválidas
 - Todas as transições são primeiro gravadas na outbox local, depois enviadas ao backend
 
 ---
@@ -835,17 +952,19 @@ stateDiagram-v2
 |---|---|
 | **Flask (Python)** como backend | Microframework leve, curva de aprendizado baixa, ideal para APIs REST de porte médio |
 | **SQLite** como banco do servidor | Embutido no Python, não requer servidor separado, suficiente para o escopo do projeto |
-| **RabbitMQ** como MOM | Broker robusto com suporte nativo a AMQP |
-| **Exchange tipo direct** | Permite roteamento 1-a-1 via *routing_keys* direcionadas aos IDs dos usuários |
-| **Filas dinâmicas exclusivas** | Filas `auto-delete + exclusive` são criadas por conexão ativa; o estado é sempre recuperado via REST ao reconectar |
-| **AMQP direto nos apps Flutter** | Fidelidade máxima à EDA; apps assinam filas diretamente no broker sem polling, atendendo o requisito de notificação assíncrona sem polling contínuo |
-| **Offline-first com SQLite local** | Apps funcionam sem rede; ações são persistidas na outbox local e sincronizadas ao servidor quando a conexão é restaurada |
-| **Outbox Pattern** | Garante que nenhuma ação do usuário seja perdida por falta de conectividade; a ordem de envio é preservada pelo campo `criado_em` |
-| **Sync REST ao reconectar** | Como filas AMQP são `auto-delete`, ao voltar online o app faz `GET /os` para recuperar o estado atual antes de reassinar o AMQP |
-| **Reconexão com backoff exponencial** | Mitiga a ausência de reconexão automática no `dart_amqp` em cenários de queda de rede ou retorno do background |
-| **Podman** para RabbitMQ | Alternativa rootless ao Docker; sem necessidade de daemon privilegiado; comando equivalente ao Docker |
-| **Portas expostas em `0.0.0.0`** | Necessário para que apps em emuladores ou dispositivos físicos alcancem Flask e RabbitMQ no host |
+| **RabbitMQ** como MOM | Broker robusto com suporte nativo a AMQP, filas duráveis e persistência de mensagens |
+| **Exchange tipo direct** | Permite roteamento por routing key para filas específicas de cada perfil |
+| **Filas duráveis com mensagens persistentes** | Garante que mensagens não são perdidas durante offline prolongado (semanas/meses) |
+| **Sync-first ao reconectar** | Ao voltar online, GET /os traz o estado autoritativo do servidor antes de drenar a outbox — evita conflitos |
+| **Descarte de mensagens AMQP antigas** | Após sync REST, mensagens acumuladas na fila representam estados intermediários já superados |
+| **AMQP direto nos apps Flutter** | Fidelidade à EDA; apps assinam filas diretamente no broker sem polling |
+| **Offline-first com SQLite local** | Apps funcionam sem rede por tempo indeterminado; outbox garante zero perda de ações |
+| **Outbox Pattern** | Garante que nenhuma ação do usuário seja perdida; ordem preservada pelo campo `criado_em` |
+| **409 Conflict para transições inválidas** | Backend é árbitro final; ações offline conflitantes são resolvidas automaticamente |
+| **Podman Compose** para RabbitMQ | Ambiente reproduzível com um único comando, sem daemon root |
+| **Portas expostas em `0.0.0.0`** | Necessário para que apps em emuladores ou dispositivos físicos alcancem Flask e RabbitMQ |
 | **Clean Architecture nos apps** | Separação de responsabilidades (models/services/screens) facilita manutenção e testes |
+| **connectivity_plus** para detecção de rede | Pacote Flutter maduro que detecta mudanças de conectividade automaticamente |
 
 ---
 
@@ -857,12 +976,14 @@ flowchart TD
     B --> C[Grava OS na outbox local status=pendente]
     C --> D{Online?}
     D -->|Sim| E[Envia POST /os ao Backend]
-    D -->|Não| W[Aguarda reconexão]
-    W --> D
+    D -->|Não| W[Aguarda reconexão via ConnectivityService]
+    W --> SYNC[Sync-first: GET /os para atualizar cache]
+    SYNC --> RECONCILE[Filtra outbox: descarta ações conflitantes]
+    RECONCILE --> E
     E --> F[Backend persiste OS no SQLite]
     F --> G[Marca outbox como enviado]
-    F --> H[Backend publica 'os.criada' no RabbitMQ]
-    H --> I[RabbitMQ roteia para fila do técnico]
+    F --> H[Backend publica os.criada no RabbitMQ]
+    H --> I[RabbitMQ roteia para fila.tecnico]
     I --> J[App Técnico recebe via AMQP]
     J --> K[Grava OS no cache local do técnico]
     K --> L{Técnico avalia OS}
@@ -870,40 +991,57 @@ flowchart TD
     L -->|Recusa| N[Grava recusa na outbox local]
     M --> O[Envia PATCH /os/:id/aceitar]
     N --> P[Envia PATCH /os/:id/recusar]
-    O --> Q[Backend publica 'os.aceita']
-    P --> R[Backend publica 'os.recusada']
-    Q --> S[RabbitMQ notifica App Operador]
+    O --> Q[Backend publica os.aceita]
+    P --> R[Backend publica os.recusada]
+    Q --> S[RabbitMQ notifica App Operador via fila.operador]
     R --> S
     S --> T[App Operador atualiza cache local]
-    O --> U[Técnico grava início na outbox]
+    O --> U[Técnico inicia execução]
     U --> V[Envia PATCH /os/:id/iniciar]
-    V --> V2[Backend publica 'os.em_andamento']
+    V --> V2[Backend publica os.em_andamento]
     V2 --> V3[RabbitMQ notifica App Operador]
-    V --> X[Técnico registra materiais e laudo na outbox]
+    V --> X[Técnico registra materiais e laudo]
     X --> Y[Envia POST materiais + PATCH /concluir]
-    Y --> Z[Backend publica 'os.concluida']
+    Y --> Z[Backend publica os.concluida]
     Z --> AA[RabbitMQ notifica App Operador]
     AA --> AB[Operador visualiza laudo e materiais]
 ```
 
 ---
 
-## 15. Requisitos Não-Funcionais
+## 15. Protocolos de Comunicação
 
-| Requisito | Descrição |
-|---|---|
-| **Disponibilidade offline** | Apps funcionam sem conectividade; ações são gravadas localmente e sincronizadas ao reconectar |
-| **Consistência eventual** | O estado dos apps converge com o servidor após a sincronização REST + drenagem da outbox |
-| **Desacoplamento** | Apps não dependem diretamente um do outro; toda comunicação passa pelo backend + MOM |
-| **Latência de eventos (online)** | Eventos entregues quase instantaneamente via conexão AMQP contínua |
-| **Resiliência de conexão** | Backoff exponencial (até 5 tentativas); após reconectar, sync REST + drain outbox garantem consistência |
-| **Ordem de eventos** | A outbox preserva a ordem de criação das ações pelo campo `criado_em` |
-| **Portabilidade** | Podman garante ambiente reproduzível sem necessidade de daemon privilegiado |
-| **Acessibilidade de rede** | Flask (porta 5000) e RabbitMQ (porta 5672) expostos em `0.0.0.0` para acesso por emuladores e dispositivos físicos na rede local |
+| Origem | Destino | Protocolo | Porta | Formato | Descrição |
+|---|---|---|---|---|---|
+| App Operador | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Operações CRUD sobre OS + sync ao reconectar |
+| App Técnico | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Aceite, recusa, início, conclusão + sync ao reconectar |
+| Backend Flask | RabbitMQ | AMQP 0-9-1 | 5672 | JSON | Publicação de eventos (mensagens persistentes) |
+| RabbitMQ | App Operador | AMQP 0-9-1 | 5672 | JSON | Entrega de eventos via fila.operador (durável) |
+| RabbitMQ | App Técnico | AMQP 0-9-1 | 5672 | JSON | Entrega de eventos via fila.tecnico (durável) |
+| Backend Flask | SQLite (servidor) | File I/O | — | SQL | Persistência de dados do servidor |
+| App Operador | SQLite (local) | File I/O | — | SQL | Cache offline + outbox de eventos |
+| App Técnico | SQLite (local) | File I/O | — | SQL | Cache offline + outbox de eventos |
 
 ---
 
-## 16. Tecnologias e Dependências
+## 16. Requisitos Não-Funcionais
+
+| Requisito | Descrição | Mecanismo |
+|---|---|---|
+| **Disponibilidade offline** | Apps funcionam sem conectividade por tempo indeterminado | SQLite local + outbox pattern |
+| **Consistência eventual** | Estado dos apps converge com o servidor após sincronização | Sync-first + drain outbox |
+| **Durabilidade de mensagens** | Mensagens AMQP não são perdidas durante offline | Filas duráveis + delivery_mode=2 |
+| **Desacoplamento** | Apps não dependem diretamente um do outro | Backend + MOM como intermediários |
+| **Latência de eventos (online)** | Eventos entregues quase instantaneamente | Conexão AMQP contínua |
+| **Resiliência de conexão** | Backoff exponencial + retry automático | ConnectivityService + AmqpService |
+| **Ordem de eventos** | Ações do usuário preservam ordem cronológica | Campo `criado_em` na outbox |
+| **Idempotência** | Transições inválidas não corrompem o estado | Máquina de estados no backend + 409 |
+| **Portabilidade** | Ambiente reproduzível | Podman Compose |
+| **Acessibilidade de rede** | Emuladores e dispositivos físicos alcançam serviços | Portas em 0.0.0.0 |
+
+---
+
+## 17. Tecnologias e Dependências
 
 ### Backend (Python)
 
@@ -912,6 +1050,7 @@ flowchart TD
 | `flask` | ≥3.0 | Framework web REST |
 | `pika` | ≥1.3 | Cliente AMQP para RabbitMQ |
 | `flask-cors` | ≥4.0 | Habilitar CORS para apps móveis |
+| `python-dotenv` | ≥1.0 | Variáveis de ambiente |
 
 ### Apps Flutter
 
@@ -920,12 +1059,12 @@ flowchart TD
 | `http` ou `dio` | Requisições HTTP REST |
 | `dart_amqp` | Conexão AMQP direta com RabbitMQ |
 | `sqflite` | SQLite local — cache de OS e outbox de eventos |
-| `connectivity_plus` | Detecção de mudanças de conectividade para acionar sync |
+| `connectivity_plus` | Detecção de mudanças de conectividade |
 | `provider` ou `riverpod` | Gerenciamento de estado |
 
 ### Infraestrutura
 
 | Ferramenta | Versão | Uso |
 |---|---|---|
-| Podman | ≥4.x | Containerização rootless do RabbitMQ |
+| Podman / Podman Compose | ≥5.x / ≥1.x | Containerização do RabbitMQ |
 | RabbitMQ | 3.12-management | Message broker + painel de administração |

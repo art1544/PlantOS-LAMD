@@ -1,3 +1,3 @@
 # models/
 
-Classes de dados (Order, User, etc).
+Classes de dados Dart: OrdemServico, Material.
