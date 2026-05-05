@@ -64,7 +64,7 @@ Em plantas industriais, a comunicação entre operadores e equipes de manutenç�
 **Protocolos de comunicação:**
 - **Apps ↔ Backend:** HTTP/REST com payloads JSON (porta 5000)
 - **Backend → RabbitMQ:** AMQP 0-9-1 (porta 5672) — publicação de eventos
-- **RabbitMQ → Apps:** Consumo via polling HTTP ou WebSocket
+- **RabbitMQ → Apps:** Consumo via assinatura AMQP direta (filas dinâmicas)
 - **Backend ↔ Banco:** SQLite (acesso local embutido, arquivo `plantos.db`)
 
 > Documentação completa da arquitetura com diagramas Mermaid (C4, sequência, ER, máquina de estados) disponível em [`docs/sprint1/arquitetura.md`](docs/sprint1/arquitetura.md).

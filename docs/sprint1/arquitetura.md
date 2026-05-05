@@ -14,7 +14,9 @@ O PlantOS adota uma **Arquitetura Orientada a Eventos (Event-Driven Architecture
 1. **Camada de Apresentação** — Dois aplicativos móveis Flutter (Operador e Técnico)
 2. **Camada de Serviço** — Backend REST em Flask (Python)
 3. **Camada de Mensageria** — RabbitMQ como MOM (Message-Oriented Middleware)
-4. **Camada de Persistência** — SQLite
+4. **Camada de Persistência** — SQLite no backend e SQLite local em cada app (offline-first)
+
+Os apps são **offline-first**: todas as ações do usuário são persistidas localmente antes de qualquer comunicação de rede. Um serviço de sincronização em background é responsável por drenar a fila local de eventos pendentes (Outbox Pattern) quando a conectividade é restaurada.
 
 ---
 
@@ -22,15 +24,19 @@ O PlantOS adota uma **Arquitetura Orientada a Eventos (Event-Driven Architecture
 
 ```mermaid
 graph TB
-    subgraph "Dispositivos Móveis"
+    subgraph "Dispositivo Móvel — Operador"
         OP[App Operador<br/>Flutter/Dart]
+        DB_OP[(SQLite Local<br/>cache + outbox)]
+    end
+
+    subgraph "Dispositivo Móvel — Técnico"
         TEC[App Técnico<br/>Flutter/Dart]
+        DB_TEC[(SQLite Local<br/>cache + outbox)]
     end
 
     subgraph "Servidor Backend"
         API[API REST<br/>Flask / Python 3.11+]
         PUB[Publicador de Eventos<br/>biblioteca pika]
-        CON[Consumidor de Eventos<br/>biblioteca pika]
     end
 
     subgraph "Infraestrutura"
@@ -38,14 +44,15 @@ graph TB
         DB[(SQLite<br/>Banco de Dados)]
     end
 
-    OP -->|HTTP/REST<br/>JSON| API
-    TEC -->|HTTP/REST<br/>JSON| API
+    OP -->|HTTP/REST JSON| API
+    TEC -->|HTTP/REST JSON| API
+    OP --- DB_OP
+    TEC --- DB_TEC
     API --> DB
     API --> PUB
     PUB -->|AMQP publicar| MQ
-    MQ -->|AMQP consumir| CON
-    MQ -.->|WebSocket/Polling| OP
-    MQ -.->|WebSocket/Polling| TEC
+    MQ -.->|Assinatura AMQP direta| OP
+    MQ -.->|Assinatura AMQP direta| TEC
 ```
 
 ---
@@ -73,7 +80,6 @@ graph LR
 
         subgraph "Mensageria"
             P1[Publicador]
-            C1[Consumidor]
         end
     end
 
@@ -84,7 +90,6 @@ graph LR
     S1 --> S3
     S3 --> P1
     P1 -->|AMQP| MQ[(RabbitMQ)]
-    MQ -->|AMQP| C1
     M1 --> DB[(SQLite)]
     M2 --> DB
 ```
@@ -101,69 +106,129 @@ sequenceDiagram
     participant Tec as App Técnico
 
     Note over Op,Tec: Fluxo 1 — Abertura de OS
+    Op->>Op: Persiste OS no SQLite local (outbox: pendente)
     Op->>API: POST /os (título, descrição, setor, equipamento, prioridade)
     API->>API: Persiste OS no SQLite (status: aberta)
-    API-->>Op: 201 Created (OS criada)
-    API->>MQ: Publish evento "os.criada" na exchange plantos.events
+    API-->>Op: 201 Created
+    Op->>Op: Marca outbox como enviado; atualiza cache local
+    API->>MQ: Publish evento "os.criada"
     MQ-->>Tec: Entrega mensagem "os.criada" (via fila técnico)
+    Tec->>Tec: Persiste OS no SQLite local (cache)
 
     Note over Op,Tec: Fluxo 2 — Aceite da OS
+    Tec->>Tec: Persiste aceite no SQLite local (outbox: pendente)
     Tec->>API: PATCH /os/:id/aceitar (tecnico_id)
     API->>API: Atualiza status para "aceita"
     API-->>Tec: 200 OK
+    Tec->>Tec: Marca outbox como enviado; atualiza cache local
     API->>MQ: Publish evento "os.aceita"
     MQ-->>Op: Entrega mensagem "os.aceita" (via fila operador)
+    Op->>Op: Atualiza cache local
 
-    Note over Op,Tec: Fluxo 3 — Registro de materiais e conclusão
+    Note over Op,Tec: Fluxo 3 — Início da execução
+    Tec->>Tec: Persiste início no SQLite local (outbox: pendente)
+    Tec->>API: PATCH /os/:id/iniciar (tecnico_id)
+    API->>API: Atualiza status para "em_andamento"
+    API-->>Tec: 200 OK
+    Tec->>Tec: Marca outbox como enviado; atualiza cache local
+    API->>MQ: Publish evento "os.em_andamento"
+    MQ-->>Op: Entrega mensagem "os.em_andamento" (via fila operador)
+    Op->>Op: Atualiza cache local
+
+    Note over Op,Tec: Fluxo 4 — Registro de materiais e conclusão
+    Tec->>Tec: Persiste materiais e laudo no SQLite local (outbox: pendente)
     Tec->>API: POST /os/:id/materiais (nome, quantidade)
     API-->>Tec: 201 Created
     Tec->>API: PATCH /os/:id/concluir (laudo)
     API->>API: Atualiza status para "concluída"
     API-->>Tec: 200 OK
+    Tec->>Tec: Marca outbox como enviado; atualiza cache local
     API->>MQ: Publish evento "os.concluida"
     MQ-->>Op: Entrega mensagem "os.concluida" (via fila operador)
+    Op->>Op: Atualiza cache local
 ```
 
 ---
 
-## 5. Diagrama de Implantação
+## 5. Diagrama de Fluxo de Reconexão (Offline → Online)
+
+```mermaid
+sequenceDiagram
+    participant App as App Flutter
+    participant DB_L as SQLite Local
+    participant API as Backend Flask
+    participant MQ as RabbitMQ
+
+    Note over App,MQ: App detecta retorno de conectividade
+    App->>API: GET /os (sincronização de estado)
+    API-->>App: Lista completa de OS atualizada
+    App->>DB_L: Atualiza cache local com estado do servidor
+
+    Note over App,MQ: Drena a outbox local
+    App->>DB_L: Busca eventos com status = "pendente" (ordenados por criado_em)
+    loop Para cada evento pendente
+        App->>API: Envia requisição REST correspondente ao evento
+        API-->>App: 200 / 201
+        App->>DB_L: Marca evento como "enviado"
+    end
+
+    Note over App,MQ: Reassina fila AMQP
+    App->>MQ: Conecta AMQP e re-declara fila exclusiva
+    MQ-->>App: Confirmação de assinatura
+    Note over App,MQ: App volta a receber eventos em tempo real
+```
+
+---
+
+## 6. Diagrama de Implantação
 
 ```mermaid
 graph TB
     subgraph "Dispositivo Móvel — Operador"
         A1[App Operador<br/>Flutter APK/IPA]
+        SQ1[(SQLite Local<br/>plantos_op.db)]
     end
 
     subgraph "Dispositivo Móvel — Técnico"
         A2[App Técnico<br/>Flutter APK/IPA]
+        SQ2[(SQLite Local<br/>plantos_tec.db)]
     end
 
     subgraph "Servidor / Host Local"
-        subgraph "Docker Compose"
-            RMQ[Contêiner RabbitMQ<br/>Porta 5672 AMQP<br/>Porta 15672 Painel Admin]
+        subgraph "Podman"
+            RMQ[Contêiner RabbitMQ<br/>Porta 5672 AMQP — rede local<br/>Porta 15672 Painel Admin]
         end
-        FLASK[Processo Flask<br/>Porta 5000<br/>HTTP REST]
+        FLASK[Processo Flask<br/>Porta 5000<br/>HTTP REST — rede local]
         SQLITE[Arquivo plantos.db<br/>SQLite]
     end
 
     A1 -->|HTTP :5000| FLASK
     A2 -->|HTTP :5000| FLASK
+    A1 -->|AMQP :5672| RMQ
+    A2 -->|AMQP :5672| RMQ
+    A1 --- SQ1
+    A2 --- SQ2
     FLASK -->|AMQP :5672| RMQ
     FLASK --- SQLITE
 ```
 
+> **Nota de rede:** tanto a porta `5000` (Flask) quanto a porta `5672` (RabbitMQ AMQP) devem ser expostas na interface de rede local (`0.0.0.0`), e não apenas em `localhost`, para que os apps Flutter rodando em emuladores ou dispositivos físicos consigam alcançar o servidor.
+
+> **Podman:** o RabbitMQ é executado via Podman (substituto rootless do Docker). O comando de inicialização é `podman run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.12-management`. Não é necessário `podman-compose` para o escopo deste projeto.
+
 ---
 
-## 6. Componentes Detalhados
+## 7. Componentes Detalhados
 
-### 6.1 App Operador (Flutter/Dart)
+### 7.1 App Operador (Flutter/Dart)
 
 | Aspecto | Descrição |
 |---|---|
 | **Tecnologia** | Flutter 3.10+ / Dart 3.x |
 | **Arquitetura interna** | Clean Architecture (models → services → screens) |
 | **Comunicação síncrona** | HTTP REST (pacote `http` ou `dio`) |
-| **Comunicação assíncrona** | Polling periódico com intervalo configurável (5s) ou WebSocket |
+| **Comunicação assíncrona** | Conexão AMQP direta com RabbitMQ via pacote `dart_amqp` |
+| **Persistência local** | SQLite local via pacote `sqflite` — cache de OS e outbox de eventos pendentes |
 | **Telas mínimas** | Lista de OS, Detalhes da OS, Criar nova OS |
 
 **Camadas do app:**
@@ -171,26 +236,55 @@ graph TB
 ```mermaid
 graph TB
     subgraph "App Operador — Flutter"
-        UI[Telas / Widgets<br/>Camada de Interface]
-        SVC[Serviços<br/>API + Tratamento de Eventos]
+        UI[Telas / Widgets]
+        SVC_API[ApiService<br/>REST + sync]
+        SVC_MQ[AmqpService<br/>conexão + reconexão]
+        SVC_SYNC[SyncService<br/>outbox + reconexão]
         MDL[Modelos<br/>Classes de Dados]
+        DB_L[(SQLite Local<br/>cache + outbox)]
     end
-    UI --> SVC
-    SVC --> MDL
-    SVC -->|HTTP| EXT[Backend REST]
+
+    UI --> SVC_API
+    UI --> SVC_MQ
+    SVC_API --> MDL
+    SVC_MQ --> MDL
+    SVC_SYNC --> SVC_API
+    SVC_SYNC --> DB_L
+    SVC_API --> DB_L
+    SVC_MQ --> DB_L
 ```
 
-### 6.2 App Técnico (Flutter/Dart)
+**Estratégia de reconexão AMQP com backoff exponencial:**
+
+```
+ao detectar desconexão AMQP:
+  tentativa 1 → aguarda 2s  → reconecta
+  tentativa 2 → aguarda 4s  → reconecta
+  tentativa 3 → aguarda 8s  → reconecta
+  tentativa 4 → aguarda 16s → reconecta
+  tentativa 5 → aguarda 32s → reconecta
+  após 5 tentativas → notifica UI com indicador "offline"
+```
+
+Ao reconectar com sucesso:
+1. `SyncService` chama `GET /os` para atualizar o cache local
+2. `SyncService` drena a outbox (eventos `status = pendente`, ordenados por `criado_em`)
+3. `AmqpService` re-declara a fila exclusiva e reassina o consumidor
+
+### 7.2 App Técnico (Flutter/Dart)
 
 | Aspecto | Descrição |
 |---|---|
 | **Tecnologia** | Flutter 3.10+ / Dart 3.x |
 | **Arquitetura interna** | Clean Architecture (models → services → screens) |
 | **Comunicação síncrona** | HTTP REST (pacote `http` ou `dio`) |
-| **Comunicação assíncrona** | Polling periódico ou WebSocket para receber novos eventos |
-| **Telas mínimas** | Lista de OS pendentes, Detalhes (aceitar/recusar), OS em andamento |
+| **Comunicação assíncrona** | Conexão AMQP direta com RabbitMQ via pacote `dart_amqp` |
+| **Persistência local** | SQLite local via pacote `sqflite` — cache de OS e outbox de eventos pendentes |
+| **Telas mínimas** | Lista de OS pendentes, Detalhes (aceitar/recusar/iniciar), OS em andamento |
 
-### 6.3 Backend Flask (Python)
+Mesma estratégia de reconexão, outbox e sync do App Operador.
+
+### 7.3 Backend Flask (Python)
 
 | Aspecto | Descrição |
 |---|---|
@@ -198,7 +292,7 @@ graph TB
 | **Arquitetura interna** | Modular por responsabilidade (routes, services, models, messaging) |
 | **Persistência** | SQLite via `sqlite3` nativo ou SQLAlchemy |
 | **Mensageria** | Biblioteca `pika` para conexão AMQP com RabbitMQ |
-| **Porta** | 5000 (HTTP) |
+| **Porta** | 5000 (HTTP, exposta em `0.0.0.0`) |
 
 **Estrutura de módulos:**
 
@@ -219,38 +313,89 @@ backend/
     │   └── os_service.py     # Lógica de negócio
     └── messaging/
         ├── __init__.py
-        ├── publisher.py      # Publica eventos no RabbitMQ
-        └── consumer.py       # Consome eventos (opcional no backend)
+        └── publisher.py      # Publica eventos no RabbitMQ
 ```
 
-### 6.4 RabbitMQ (MOM)
+### 7.4 RabbitMQ (MOM)
 
 | Aspecto | Descrição |
 |---|---|
 | **Tecnologia** | RabbitMQ 3.12 com plugin Management |
 | **Protocolo** | AMQP 0-9-1 |
-| **Containerização** | Docker (via docker-compose.yml) |
-| **Portas** | 5672 (AMQP), 15672 (Management UI) |
+| **Containerização** | Podman (rootless) |
+| **Portas** | 5672 (AMQP, exposta em `0.0.0.0`), 15672 (Management UI) |
 | **Credenciais dev** | guest / guest |
+
+**Comando de inicialização:**
+
+```bash
+podman run -d \
+  --name rabbitmq \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  rabbitmq:3.12-management
+```
 
 **Topologia de exchanges e filas:**
 
 ```mermaid
 graph LR
     subgraph "RabbitMQ"
-        EX[Exchange<br/>plantos.events<br/>tipo: topic]
-        Q1[Fila<br/>fila.operador<br/>Binding: os.aceita, os.recusada,<br/>os.em_andamento, os.concluida]
-        Q2[Fila<br/>fila.tecnico<br/>Binding: os.criada]
+        EX[Exchange<br/>plantos.events<br/>tipo: direct]
+        Q1[Fila Dinâmica<br/>queue_op_{id}<br/>Binding: op_{id}<br/>Exclusive: true<br/>Auto-delete: true]
+        Q2[Fila Dinâmica<br/>queue_tec_{id}<br/>Binding: tec_{id}<br/>Exclusive: true<br/>Auto-delete: true]
     end
 
-    PUB[Publicador Backend] -->|routing_key: os.*| EX
-    EX -->|os.aceita<br/>os.recusada<br/>os.em_andamento<br/>os.concluida| Q1
-    EX -->|os.criada| Q2
+    PUB[Publicador Backend] -->|routing_key: op_{id} ou tec_{id}| EX
+    EX -->|op_{id}| Q1
+    EX -->|tec_{id}| Q2
     Q1 --> C1[App Operador<br/>Consumidor]
     Q2 --> C2[App Técnico<br/>Consumidor]
 ```
 
-### 6.5 SQLite (Persistência)
+> **Sobre filas auto-delete:** mensagens publicadas enquanto o app está offline são perdidas na fila AMQP. Isso é mitigado pelo fluxo de reconexão: ao voltar online, o app faz `GET /os` para sincronizar o estado mais recente antes de reassinar o AMQP. A outbox local garante que ações feitas offline sejam enviadas ao servidor na ordem correta.
+
+### 7.5 SQLite Local nos Apps (Offline-First)
+
+Cada app mantém um banco SQLite local com duas responsabilidades:
+
+**Cache de OS** — espelho local dos dados do servidor, atualizado via REST ao reconectar e via eventos AMQP em tempo real.
+
+**Outbox de eventos** — fila persistente de ações realizadas pelo usuário enquanto offline, drenada ao servidor na reconexão.
+
+**Schema do banco local (ambos os apps):**
+
+```sql
+-- Cache local das ordens de serviço
+CREATE TABLE IF NOT EXISTS os_cache (
+    id INTEGER PRIMARY KEY,
+    titulo TEXT NOT NULL,
+    descricao TEXT NOT NULL,
+    setor TEXT NOT NULL,
+    equipamento TEXT NOT NULL,
+    prioridade TEXT NOT NULL,
+    status TEXT NOT NULL,
+    operador_id TEXT NOT NULL,
+    tecnico_id TEXT,
+    laudo TEXT,
+    criado_em TEXT,
+    atualizado_em TEXT,
+    sincronizado_em TEXT  -- timestamp da última sync com o servidor
+);
+
+-- Outbox: ações pendentes de envio ao backend
+CREATE TABLE IF NOT EXISTS outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL,         -- ex: "criar_os", "aceitar_os", "concluir_os"
+    payload TEXT NOT NULL,      -- JSON com os dados da ação
+    status TEXT NOT NULL DEFAULT 'pendente',  -- pendente | enviado | erro
+    tentativas INTEGER DEFAULT 0,
+    criado_em TEXT DEFAULT (datetime('now')),
+    enviado_em TEXT
+);
+```
+
+### 7.6 SQLite Backend
 
 | Aspecto | Descrição |
 |---|---|
@@ -261,24 +406,26 @@ graph LR
 
 ---
 
-## 7. Protocolos de Comunicação
+## 8. Protocolos de Comunicação
 
 | Origem | Destino | Protocolo | Porta | Formato | Descrição |
 |---|---|---|---|---|---|
-| App Operador | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Operações CRUD sobre OS |
-| App Técnico | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Aceite, recusa, conclusão de OS |
-| Backend Flask | RabbitMQ | AMQP 0-9-1 | 5672 | JSON (payload) | Publicação de eventos |
-| RabbitMQ | App Operador | AMQP/HTTP polling | 5672/5000 | JSON | Notificação de mudanças de estado |
-| RabbitMQ | App Técnico | AMQP/HTTP polling | 5672/5000 | JSON | Notificação de novas OS |
-| Backend Flask | SQLite | File I/O | — | SQL | Persistência de dados |
+| App Operador | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Operações CRUD sobre OS + sync ao reconectar |
+| App Técnico | Backend Flask | HTTP/1.1 REST | 5000 | JSON | Aceite, recusa, início, conclusão + sync ao reconectar |
+| Backend Flask | RabbitMQ | AMQP 0-9-1 | 5672 | JSON | Publicação de eventos |
+| App Operador | RabbitMQ | AMQP 0-9-1 | 5672 | JSON | Assinatura direta de fila exclusiva |
+| App Técnico | RabbitMQ | AMQP 0-9-1 | 5672 | JSON | Assinatura direta de fila exclusiva |
+| Backend Flask | SQLite (servidor) | File I/O | — | SQL | Persistência de dados do servidor |
+| App Operador | SQLite (local) | File I/O | — | SQL | Cache offline + outbox de eventos |
+| App Técnico | SQLite (local) | File I/O | — | SQL | Cache offline + outbox de eventos |
 
 ---
 
-## 8. Modelo de Eventos (Mensageria)
+## 9. Modelo de Eventos (Mensageria)
 
-### 8.1 Configuração do RabbitMQ
+### 9.1 Configuração do RabbitMQ
 
-- **Exchange:** `plantos.events` (type: `topic`, durable: true)
+- **Exchange:** `plantos.events` (type: `direct`, durable: true)
 - **Filas:**
   - `fila.operador` — Recebe eventos destinados ao operador
   - `fila.tecnico` — Recebe eventos destinados ao técnico
@@ -286,7 +433,7 @@ graph LR
   - `fila.tecnico` ← routing key `os.criada`
   - `fila.operador` ← routing keys `os.aceita`, `os.recusada`, `os.em_andamento`, `os.concluida`
 
-### 8.2 Payloads dos Eventos
+### 9.2 Payloads dos Eventos
 
 #### Evento `os.criada`
 
@@ -379,9 +526,9 @@ graph LR
 
 ---
 
-## 9. Endpoints REST — Especificação Detalhada
+## 10. Endpoints REST — Especificação Detalhada
 
-### 9.1 Criar Ordem de Serviço
+### 10.1 Criar Ordem de Serviço
 
 ```
 POST /os
@@ -414,7 +561,7 @@ Response: 201 Created
 }
 ```
 
-### 9.2 Listar Ordens de Serviço
+### 10.2 Listar Ordens de Serviço
 
 ```
 GET /os
@@ -434,7 +581,7 @@ Response: 200 OK
 ]
 ```
 
-### 9.3 Consultar OS por ID
+### 10.3 Consultar OS por ID
 
 ```
 GET /os/:id
@@ -456,7 +603,7 @@ Response: 200 OK
 }
 ```
 
-### 9.4 Aceitar OS
+### 10.4 Aceitar OS
 
 ```
 PATCH /os/:id/aceitar
@@ -476,7 +623,7 @@ Response: 200 OK
 }
 ```
 
-### 9.5 Recusar OS
+### 10.5 Recusar OS
 
 ```
 PATCH /os/:id/recusar
@@ -495,7 +642,27 @@ Response: 200 OK
 }
 ```
 
-### 9.6 Concluir OS
+### 10.6 Iniciar OS
+
+```
+PATCH /os/:id/iniciar
+Content-Type: application/json
+
+Request Body:
+{
+  "tecnico_id": "tec-003"
+}
+
+Response: 200 OK
+{
+  "id": 1,
+  "status": "em_andamento",
+  "tecnico_id": "tec-003",
+  "atualizado_em": "2026-05-02T15:00:00Z"
+}
+```
+
+### 10.7 Concluir OS
 
 ```
 PATCH /os/:id/concluir
@@ -516,7 +683,7 @@ Response: 200 OK
 }
 ```
 
-### 9.7 Registrar Materiais
+### 10.8 Registrar Materiais
 
 ```
 POST /os/:id/materiais
@@ -537,7 +704,7 @@ Response: 201 Created
 }
 ```
 
-### 9.8 Listar Materiais de uma OS
+### 10.9 Listar Materiais de uma OS
 
 ```
 GET /os/:id/materiais
@@ -551,7 +718,7 @@ Response: 200 OK
 
 ---
 
-## 10. Modelo de Dados (Schema SQLite)
+## 11. Modelo de Dados — Backend (Schema SQLite)
 
 ```sql
 CREATE TABLE IF NOT EXISTS ordem_servico (
@@ -578,7 +745,7 @@ CREATE TABLE IF NOT EXISTS material (
 );
 ```
 
-### Diagrama ER
+### Diagrama ER — Backend
 
 ```mermaid
 erDiagram
@@ -607,9 +774,40 @@ erDiagram
     ORDEM_SERVICO ||--o{ MATERIAL : "contém"
 ```
 
+### Diagrama ER — SQLite Local (Apps)
+
+```mermaid
+erDiagram
+    OS_CACHE {
+        int id PK
+        text titulo
+        text descricao
+        text setor
+        text equipamento
+        text prioridade
+        text status
+        text operador_id
+        text tecnico_id
+        text laudo
+        text criado_em
+        text atualizado_em
+        text sincronizado_em
+    }
+
+    OUTBOX {
+        int id PK
+        text tipo
+        text payload
+        text status
+        int tentativas
+        text criado_em
+        text enviado_em
+    }
+```
+
 ---
 
-## 11. Máquina de Estados — Ordem de Serviço
+## 12. Máquina de Estados — Ordem de Serviço
 
 ```mermaid
 stateDiagram-v2
@@ -627,64 +825,85 @@ stateDiagram-v2
 - Apenas OS com status `aceita` podem passar para `em_andamento`
 - Apenas OS com status `em_andamento` podem ser concluídas
 - Conclusão exige um laudo técnico preenchido
+- Todas as transições são primeiro gravadas na outbox local, depois enviadas ao backend
 
 ---
 
-## 12. Decisões Arquiteturais
+## 13. Decisões Arquiteturais
 
 | Decisão | Justificativa |
 |---|---|
 | **Flask (Python)** como backend | Microframework leve, curva de aprendizado baixa, ideal para APIs REST de porte médio |
-| **SQLite** como banco | Embutido no Python, não requer servidor separado, suficiente para o escopo do projeto |
-| **RabbitMQ** como MOM | Broker robusto com suporte nativo a AMQP, exchanges do tipo topic permitem roteamento flexível de eventos |
-| **Exchange tipo topic** | Permite roteamento por padrão de routing key (ex.: `os.*`), facilitando a adição de novos eventos futuramente |
-| **Docker Compose** para RabbitMQ | Garante reprodutibilidade do ambiente, facilita setup em qualquer máquina |
-| **Polling nos apps Flutter** | Mais simples que conexão AMQP direta no mobile; pode evoluir para WebSocket na Sprint 4 |
+| **SQLite** como banco do servidor | Embutido no Python, não requer servidor separado, suficiente para o escopo do projeto |
+| **RabbitMQ** como MOM | Broker robusto com suporte nativo a AMQP |
+| **Exchange tipo direct** | Permite roteamento 1-a-1 via *routing_keys* direcionadas aos IDs dos usuários |
+| **Filas dinâmicas exclusivas** | Filas `auto-delete + exclusive` são criadas por conexão ativa; o estado é sempre recuperado via REST ao reconectar |
+| **AMQP direto nos apps Flutter** | Fidelidade máxima à EDA; apps assinam filas diretamente no broker sem polling, atendendo o requisito de notificação assíncrona sem polling contínuo |
+| **Offline-first com SQLite local** | Apps funcionam sem rede; ações são persistidas na outbox local e sincronizadas ao servidor quando a conexão é restaurada |
+| **Outbox Pattern** | Garante que nenhuma ação do usuário seja perdida por falta de conectividade; a ordem de envio é preservada pelo campo `criado_em` |
+| **Sync REST ao reconectar** | Como filas AMQP são `auto-delete`, ao voltar online o app faz `GET /os` para recuperar o estado atual antes de reassinar o AMQP |
+| **Reconexão com backoff exponencial** | Mitiga a ausência de reconexão automática no `dart_amqp` em cenários de queda de rede ou retorno do background |
+| **Podman** para RabbitMQ | Alternativa rootless ao Docker; sem necessidade de daemon privilegiado; comando equivalente ao Docker |
+| **Portas expostas em `0.0.0.0`** | Necessário para que apps em emuladores ou dispositivos físicos alcancem Flask e RabbitMQ no host |
 | **Clean Architecture nos apps** | Separação de responsabilidades (models/services/screens) facilita manutenção e testes |
 
 ---
 
-## 13. Fluxo Completo — Ponta a Ponta
+## 14. Fluxo Completo — Ponta a Ponta
 
 ```mermaid
 flowchart TD
     A[Operador identifica falha] --> B[Abre OS no App Operador]
-    B --> C[App envia POST /os ao Backend]
-    C --> D[Backend persiste OS no SQLite]
-    D --> E[Backend publica 'os.criada' no RabbitMQ]
-    E --> F[RabbitMQ roteia para fila.tecnico]
-    F --> G[App Técnico recebe notificação]
-    G --> H{Técnico avalia OS}
-    H -->|Aceita| I[App envia PATCH /os/:id/aceitar]
-    H -->|Recusa| J[App envia PATCH /os/:id/recusar]
-    I --> K[Backend atualiza status e publica 'os.aceita']
-    J --> L[Backend atualiza status e publica 'os.recusada']
-    K --> M[RabbitMQ notifica App Operador]
-    L --> M
-    I --> N[Técnico executa manutenção]
-    N --> O[Registra materiais: POST /os/:id/materiais]
-    O --> P[Conclui com laudo: PATCH /os/:id/concluir]
-    P --> Q[Backend publica 'os.concluida']
-    Q --> R[RabbitMQ notifica App Operador]
-    R --> S[Operador visualiza laudo e materiais]
+    B --> C[Grava OS na outbox local status=pendente]
+    C --> D{Online?}
+    D -->|Sim| E[Envia POST /os ao Backend]
+    D -->|Não| W[Aguarda reconexão]
+    W --> D
+    E --> F[Backend persiste OS no SQLite]
+    F --> G[Marca outbox como enviado]
+    F --> H[Backend publica 'os.criada' no RabbitMQ]
+    H --> I[RabbitMQ roteia para fila do técnico]
+    I --> J[App Técnico recebe via AMQP]
+    J --> K[Grava OS no cache local do técnico]
+    K --> L{Técnico avalia OS}
+    L -->|Aceita| M[Grava aceite na outbox local]
+    L -->|Recusa| N[Grava recusa na outbox local]
+    M --> O[Envia PATCH /os/:id/aceitar]
+    N --> P[Envia PATCH /os/:id/recusar]
+    O --> Q[Backend publica 'os.aceita']
+    P --> R[Backend publica 'os.recusada']
+    Q --> S[RabbitMQ notifica App Operador]
+    R --> S
+    S --> T[App Operador atualiza cache local]
+    O --> U[Técnico grava início na outbox]
+    U --> V[Envia PATCH /os/:id/iniciar]
+    V --> V2[Backend publica 'os.em_andamento']
+    V2 --> V3[RabbitMQ notifica App Operador]
+    V --> X[Técnico registra materiais e laudo na outbox]
+    X --> Y[Envia POST materiais + PATCH /concluir]
+    Y --> Z[Backend publica 'os.concluida']
+    Z --> AA[RabbitMQ notifica App Operador]
+    AA --> AB[Operador visualiza laudo e materiais]
 ```
 
 ---
 
-## 14. Requisitos Não-Funcionais
+## 15. Requisitos Não-Funcionais
 
 | Requisito | Descrição |
 |---|---|
-| **Disponibilidade** | O sistema deve operar enquanto o backend e RabbitMQ estiverem ativos |
+| **Disponibilidade offline** | Apps funcionam sem conectividade; ações são gravadas localmente e sincronizadas ao reconectar |
+| **Consistência eventual** | O estado dos apps converge com o servidor após a sincronização REST + drenagem da outbox |
 | **Desacoplamento** | Apps não dependem diretamente um do outro; toda comunicação passa pelo backend + MOM |
-| **Latência de eventos** | Eventos devem ser entregues em menos de 5 segundos após publicação (configuração de polling) |
-| **Escalabilidade** | Topologia RabbitMQ permite adicionar filas/consumidores sem alterar o producer |
-| **Resiliência** | Mensagens persistem nas filas do RabbitMQ até serem consumidas (durable queues) |
-| **Portabilidade** | Docker Compose garante que o ambiente é reproduzível em qualquer SO |
+| **Latência de eventos (online)** | Eventos entregues quase instantaneamente via conexão AMQP contínua |
+| **Resiliência de conexão** | Backoff exponencial (até 5 tentativas); após reconectar, sync REST + drain outbox garantem consistência |
+| **Ordem de eventos** | A outbox preserva a ordem de criação das ações pelo campo `criado_em` |
+| **Portabilidade** | Podman garante ambiente reproduzível sem necessidade de daemon privilegiado |
+| **Acessibilidade de rede** | Flask (porta 5000) e RabbitMQ (porta 5672) expostos em `0.0.0.0` para acesso por emuladores e dispositivos físicos na rede local |
 
 ---
 
-## 15. Tecnologias e Dependências
+## 16. Tecnologias e Dependências
 
 ### Backend (Python)
 
@@ -699,13 +918,14 @@ flowchart TD
 | Pacote | Uso |
 |---|---|
 | `http` ou `dio` | Requisições HTTP REST |
-| `dart_amqp` (opcional) | Conexão AMQP direta com RabbitMQ |
+| `dart_amqp` | Conexão AMQP direta com RabbitMQ |
+| `sqflite` | SQLite local — cache de OS e outbox de eventos |
+| `connectivity_plus` | Detecção de mudanças de conectividade para acionar sync |
 | `provider` ou `riverpod` | Gerenciamento de estado |
 
 ### Infraestrutura
 
 | Ferramenta | Versão | Uso |
 |---|---|---|
-| Docker | ≥24.x | Containerização |
-| Docker Compose | ≥3.8 | Orquestração do RabbitMQ |
-| RabbitMQ | 3.12 | Message broker |
+| Podman | ≥4.x | Containerização rootless do RabbitMQ |
+| RabbitMQ | 3.12-management | Message broker + painel de administração |
