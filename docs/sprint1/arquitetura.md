@@ -68,9 +68,7 @@ graph LR
         end
 
         subgraph "Serviços"
-            S1[OrdemServicoService]
-            S2[MaterialService]
-            S3[EventoService]
+            S1[OSService]
         end
 
         subgraph "Modelos"
@@ -84,11 +82,10 @@ graph LR
     end
 
     R1 --> S1
-    R2 --> S2
+    R2 --> S1
     S1 --> M1
-    S2 --> M2
-    S1 --> S3
-    S3 --> P1
+    S1 --> M2
+    S1 --> P1
     P1 -->|AMQP| MQ[(RabbitMQ)]
     M1 --> DB[(SQLite)]
     M2 --> DB

@@ -163,6 +163,20 @@ PlantOS-LAMD/
 
 ---
 
+## Coleção de Testes (Postman)
+
+O arquivo [`backend/PlantOS.postman_collection.json`](backend/PlantOS.postman_collection.json) contém a coleção completa para importar no Postman, organizada em três grupos:
+
+1. **Ordens de Serviço** — CRUD + transições de status + casos de erro (400, 404, 409)
+2. **Materiais** — Registro e listagem de materiais por OS
+3. **Fluxo Completo** — Execução sequencial do ciclo de vida completo de uma OS (criar → aceitar → iniciar → registrar material → concluir com laudo → verificar)
+
+Todos os requests incluem exemplos de resposta salvos (`saved examples`).
+
+**Para importar:** Postman → Import → selecione o arquivo JSON.
+
+---
+
 ## Pré-requisitos
 
 - Python 3.11+

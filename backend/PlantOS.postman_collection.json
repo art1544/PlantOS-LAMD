@@ -1,0 +1,1076 @@
+{
+	"info": {
+		"_postman_id": "plantos-collection-2026",
+		"name": "PlantOS — Ordens de Serviço",
+		"description": "Coleção de testes para a API REST do PlantOS.\nSistema de ordens de serviço para plantas industriais.\n\nDisciplina: Lab. de Desenvolvimento de Aplicações Móveis e Distribuídas — PUC Minas\nSprint 1 — Arquitetura e Backend REST",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Ordens de Serviço",
+			"description": "Endpoints de gestão de Ordens de Serviço (CRUD + transições de status)",
+			"item": [
+				{
+					"name": "Criar OS — Prioridade Alta",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras. Necessária substituição da gaxeta.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"operador_id\": \"op-001\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os",
+							"host": ["{{base_url}}"],
+							"path": ["os"]
+						},
+						"description": "Cria uma nova ordem de serviço com prioridade alta.\n\n**Campos obrigatórios:** titulo, descricao, setor, equipamento, prioridade, operador_id\n\n**Prioridades válidas:** baixa, media, alta, critica\n\n**Status inicial:** aberta"
+					},
+					"response": [
+						{
+							"name": "201 — OS criada com sucesso",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"operador_id\": \"op-001\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os",
+									"host": ["{{base_url}}"],
+									"path": ["os"]
+								}
+							},
+							"status": "CREATED",
+							"code": 201,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"status\": \"aberta\",\n  \"operador_id\": \"op-001\",\n  \"tecnico_id\": null,\n  \"laudo\": null,\n  \"criado_em\": \"2026-05-11T20:00:00.000000Z\",\n  \"atualizado_em\": \"2026-05-11T20:00:00.000000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Criar OS — Prioridade Média",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titulo\": \"Motor com ruído anormal\",\n  \"descricao\": \"Motor da esteira ET-03 apresenta ruído metálico intermitente durante operação em carga máxima.\",\n  \"setor\": \"Produção\",\n  \"equipamento\": \"Esteira ET-03\",\n  \"prioridade\": \"media\",\n  \"operador_id\": \"op-002\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os",
+							"host": ["{{base_url}}"],
+							"path": ["os"]
+						},
+						"description": "Cria uma segunda OS para testar listagem e filtros."
+					},
+					"response": [
+						{
+							"name": "201 — OS criada com sucesso",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"titulo\": \"Motor com ruído anormal\",\n  \"descricao\": \"Motor da esteira ET-03 apresenta ruído metálico intermitente.\",\n  \"setor\": \"Produção\",\n  \"equipamento\": \"Esteira ET-03\",\n  \"prioridade\": \"media\",\n  \"operador_id\": \"op-002\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os",
+									"host": ["{{base_url}}"],
+									"path": ["os"]
+								}
+							},
+							"status": "CREATED",
+							"code": 201,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 2,\n  \"titulo\": \"Motor com ruído anormal\",\n  \"descricao\": \"Motor da esteira ET-03 apresenta ruído metálico intermitente.\",\n  \"setor\": \"Produção\",\n  \"equipamento\": \"Esteira ET-03\",\n  \"prioridade\": \"media\",\n  \"status\": \"aberta\",\n  \"operador_id\": \"op-002\",\n  \"tecnico_id\": null,\n  \"laudo\": null,\n  \"criado_em\": \"2026-05-11T20:01:00.000000Z\",\n  \"atualizado_em\": \"2026-05-11T20:01:00.000000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Criar OS — Erro: campo ausente",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titulo\": \"Teste incompleto\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os",
+							"host": ["{{base_url}}"],
+							"path": ["os"]
+						},
+						"description": "Testa validação de campos obrigatórios. Deve retornar 400."
+					},
+					"response": [
+						{
+							"name": "400 — Campo obrigatório ausente",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"titulo\": \"Teste incompleto\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os",
+									"host": ["{{base_url}}"],
+									"path": ["os"]
+								}
+							},
+							"status": "BAD REQUEST",
+							"code": 400,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"erro\": \"Campo obrigatório ausente: descricao\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Criar OS — Erro: prioridade inválida",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titulo\": \"Teste prioridade\",\n  \"descricao\": \"Teste\",\n  \"setor\": \"Teste\",\n  \"equipamento\": \"Teste\",\n  \"prioridade\": \"urgentissima\",\n  \"operador_id\": \"op-001\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os",
+							"host": ["{{base_url}}"],
+							"path": ["os"]
+						},
+						"description": "Testa validação de prioridade inválida. Deve retornar 400."
+					},
+					"response": [
+						{
+							"name": "400 — Prioridade inválida",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"titulo\": \"Teste prioridade\",\n  \"descricao\": \"Teste\",\n  \"setor\": \"Teste\",\n  \"equipamento\": \"Teste\",\n  \"prioridade\": \"urgentissima\",\n  \"operador_id\": \"op-001\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os",
+									"host": ["{{base_url}}"],
+									"path": ["os"]
+								}
+							},
+							"status": "BAD REQUEST",
+							"code": 400,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"erro\": \"Prioridade inválida: urgentissima\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Listar todas as OS",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os",
+							"host": ["{{base_url}}"],
+							"path": ["os"]
+						},
+						"description": "Retorna todas as ordens de serviço cadastradas, ordenadas por data de criação (mais recente primeiro)."
+					},
+					"response": [
+						{
+							"name": "200 — Lista de OS",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/os",
+									"host": ["{{base_url}}"],
+									"path": ["os"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "[\n  {\n    \"id\": 2,\n    \"titulo\": \"Motor com ruído anormal\",\n    \"status\": \"aberta\",\n    \"prioridade\": \"media\",\n    \"operador_id\": \"op-002\"\n  },\n  {\n    \"id\": 1,\n    \"titulo\": \"Vazamento na válvula V-102\",\n    \"status\": \"aberta\",\n    \"prioridade\": \"alta\",\n    \"operador_id\": \"op-001\"\n  }\n]"
+						}
+					]
+				},
+				{
+					"name": "Listar OS por status (filtro)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os?status=aberta",
+							"host": ["{{base_url}}"],
+							"path": ["os"],
+							"query": [
+								{
+									"key": "status",
+									"value": "aberta",
+									"description": "Filtrar por status: aberta, aceita, em_andamento, concluida, recusada"
+								}
+							]
+						},
+						"description": "Lista OS filtradas por status. Parâmetros opcionais: status, operador_id."
+					},
+					"response": [
+						{
+							"name": "200 — OS filtradas por status",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/os?status=aberta",
+									"host": ["{{base_url}}"],
+									"path": ["os"],
+									"query": [
+										{
+											"key": "status",
+											"value": "aberta"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "[\n  {\n    \"id\": 1,\n    \"titulo\": \"Vazamento na válvula V-102\",\n    \"status\": \"aberta\",\n    \"prioridade\": \"alta\"\n  }\n]"
+						}
+					]
+				},
+				{
+					"name": "Listar OS por operador (filtro)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os?operador_id=op-001",
+							"host": ["{{base_url}}"],
+							"path": ["os"],
+							"query": [
+								{
+									"key": "operador_id",
+									"value": "op-001",
+									"description": "Filtrar por ID do operador"
+								}
+							]
+						},
+						"description": "Lista OS filtradas pelo operador que abriu."
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar OS por ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os/1",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1"]
+						},
+						"description": "Retorna os detalhes completos de uma OS pelo seu ID."
+					},
+					"response": [
+						{
+							"name": "200 — OS encontrada",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/os/1",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"status\": \"aberta\",\n  \"operador_id\": \"op-001\",\n  \"tecnico_id\": null,\n  \"laudo\": null,\n  \"criado_em\": \"2026-05-11T20:00:00.000000Z\",\n  \"atualizado_em\": \"2026-05-11T20:00:00.000000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Consultar OS — Erro: não encontrada",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os/999",
+							"host": ["{{base_url}}"],
+							"path": ["os", "999"]
+						},
+						"description": "Testa consulta de OS inexistente. Deve retornar 404."
+					},
+					"response": [
+						{
+							"name": "404 — OS não encontrada",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/os/999",
+									"host": ["{{base_url}}"],
+									"path": ["os", "999"]
+								}
+							},
+							"status": "NOT FOUND",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"erro\": \"OS não encontrada\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Aceitar OS",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/1/aceitar",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "aceitar"]
+						},
+						"description": "Técnico aceita uma OS aberta.\n\n**Pré-condição:** OS com status `aberta`\n**Pós-condição:** Status muda para `aceita`, tecnico_id é preenchido\n\n**Campo obrigatório:** tecnico_id"
+					},
+					"response": [
+						{
+							"name": "200 — OS aceita",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/1/aceitar",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "aceitar"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"status\": \"aceita\",\n  \"tecnico_id\": \"tec-001\",\n  \"atualizado_em\": \"2026-05-11T20:05:00.000000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Recusar OS",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-002\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/2/recusar",
+							"host": ["{{base_url}}"],
+							"path": ["os", "2", "recusar"]
+						},
+						"description": "Técnico recusa uma OS aberta.\n\n**Pré-condição:** OS com status `aberta`\n**Pós-condição:** Status muda para `recusada`, tecnico_id é preenchido\n\n**Campo obrigatório:** tecnico_id"
+					},
+					"response": [
+						{
+							"name": "200 — OS recusada",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tecnico_id\": \"tec-002\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/2/recusar",
+									"host": ["{{base_url}}"],
+									"path": ["os", "2", "recusar"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 2,\n  \"titulo\": \"Motor com ruído anormal\",\n  \"status\": \"recusada\",\n  \"tecnico_id\": \"tec-002\",\n  \"atualizado_em\": \"2026-05-11T20:06:00.000000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Iniciar execução da OS",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/1/iniciar",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "iniciar"]
+						},
+						"description": "Técnico inicia a execução de uma OS aceita.\n\n**Pré-condição:** OS com status `aceita`\n**Pós-condição:** Status muda para `em_andamento`\n\n**Campo obrigatório:** tecnico_id"
+					},
+					"response": [
+						{
+							"name": "200 — OS em andamento",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/1/iniciar",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "iniciar"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"status\": \"em_andamento\",\n  \"tecnico_id\": \"tec-001\",\n  \"atualizado_em\": \"2026-05-11T20:10:00.000000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Concluir OS com laudo",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-001\",\n  \"laudo\": \"Substituída gaxeta desgastada na válvula V-102 e realizado torque nos parafusos de fixação conforme especificação do fabricante. Vazamento completamente eliminado. Equipamento liberado para operação.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/1/concluir",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "concluir"]
+						},
+						"description": "Técnico conclui a OS registrando o laudo técnico.\n\n**Pré-condição:** OS com status `em_andamento`\n**Pós-condição:** Status muda para `concluida`, laudo é preenchido\n\n**Campos obrigatórios:** tecnico_id, laudo"
+					},
+					"response": [
+						{
+							"name": "200 — OS concluída",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tecnico_id\": \"tec-001\",\n  \"laudo\": \"Substituída gaxeta desgastada. Vazamento corrigido.\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/1/concluir",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "concluir"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"status\": \"concluida\",\n  \"tecnico_id\": \"tec-001\",\n  \"laudo\": \"Substituída gaxeta desgastada. Vazamento corrigido.\",\n  \"atualizado_em\": \"2026-05-11T20:15:00.000000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Concluir OS — Erro: sem laudo",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/1/concluir",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "concluir"]
+						},
+						"description": "Testa conclusão sem laudo. Deve retornar 400."
+					},
+					"response": [
+						{
+							"name": "400 — Laudo obrigatório",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/1/concluir",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "concluir"]
+								}
+							},
+							"status": "BAD REQUEST",
+							"code": 400,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"erro\": \"Campo obrigatório ausente: laudo\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Transição inválida — Erro 409",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/1/aceitar",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "aceitar"]
+						},
+						"description": "Testa transição de status inválida (ex: aceitar OS já concluída). Deve retornar 409 Conflict."
+					},
+					"response": [
+						{
+							"name": "409 — Transição inválida",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/1/aceitar",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "aceitar"]
+								}
+							},
+							"status": "CONFLICT",
+							"code": 409,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"erro\": \"Transição inválida. Status atual: concluida. Esperado: nenhuma transição possível\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Materiais",
+			"description": "Endpoints de registro e consulta de materiais utilizados em cada OS",
+			"item": [
+				{
+					"name": "Registrar material na OS",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nome\": \"Gaxeta 3/4\\\"\",\n  \"quantidade\": 2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/1/materiais",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "materiais"]
+						},
+						"description": "Registra um material utilizado na execução de uma OS.\n\n**Campos obrigatórios:** nome, quantidade (inteiro > 0)\n\n**Pré-condição:** OS deve existir"
+					},
+					"response": [
+						{
+							"name": "201 — Material registrado",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nome\": \"Gaxeta 3/4\\\"\",\n  \"quantidade\": 2\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/1/materiais",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "materiais"]
+								}
+							},
+							"status": "CREATED",
+							"code": 201,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 1,\n  \"ordem_servico_id\": 1,\n  \"nome\": \"Gaxeta 3/4\\\"\",\n  \"quantidade\": 2\n}"
+						}
+					]
+				},
+				{
+					"name": "Registrar segundo material",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nome\": \"Parafuso M10 x 30mm\",\n  \"quantidade\": 4\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/1/materiais",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "materiais"]
+						},
+						"description": "Registra um segundo material para demonstrar listagem múltipla."
+					},
+					"response": [
+						{
+							"name": "201 — Material registrado",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nome\": \"Parafuso M10 x 30mm\",\n  \"quantidade\": 4\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/os/1/materiais",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "materiais"]
+								}
+							},
+							"status": "CREATED",
+							"code": 201,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"id\": 2,\n  \"ordem_servico_id\": 1,\n  \"nome\": \"Parafuso M10 x 30mm\",\n  \"quantidade\": 4\n}"
+						}
+					]
+				},
+				{
+					"name": "Listar materiais da OS",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os/1/materiais",
+							"host": ["{{base_url}}"],
+							"path": ["os", "1", "materiais"]
+						},
+						"description": "Lista todos os materiais registrados em uma OS."
+					},
+					"response": [
+						{
+							"name": "200 — Lista de materiais",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/os/1/materiais",
+									"host": ["{{base_url}}"],
+									"path": ["os", "1", "materiais"]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "[\n  {\n    \"id\": 1,\n    \"ordem_servico_id\": 1,\n    \"nome\": \"Gaxeta 3/4\\\"\",\n    \"quantidade\": 2\n  },\n  {\n    \"id\": 2,\n    \"ordem_servico_id\": 1,\n    \"nome\": \"Parafuso M10 x 30mm\",\n    \"quantidade\": 4\n  }\n]"
+						}
+					]
+				},
+				{
+					"name": "Listar materiais — Erro: OS inexistente",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os/999/materiais",
+							"host": ["{{base_url}}"],
+							"path": ["os", "999", "materiais"]
+						},
+						"description": "Testa listagem de materiais de OS inexistente. Deve retornar 404."
+					},
+					"response": [
+						{
+							"name": "404 — OS não encontrada",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/os/999/materiais",
+									"host": ["{{base_url}}"],
+									"path": ["os", "999", "materiais"]
+								}
+							},
+							"status": "NOT FOUND",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"erro\": \"OS não encontrada\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Fluxo Completo (Execução Sequencial)",
+			"description": "Execute esta pasta na ordem para simular o fluxo completo:\n1. Criar OS\n2. Aceitar OS\n3. Iniciar execução\n4. Registrar materiais\n5. Concluir com laudo\n6. Verificar estado final",
+			"item": [
+				{
+					"name": "1. Criar OS (Crítica)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titulo\": \"Sensor de temperatura fora de faixa\",\n  \"descricao\": \"Sensor TT-205 do reator R-01 está reportando leitura de 450°C quando o processo opera a 180°C. Possível falha no transmissor.\",\n  \"setor\": \"Reatores\",\n  \"equipamento\": \"Sensor TT-205 / Reator R-01\",\n  \"prioridade\": \"critica\",\n  \"operador_id\": \"op-003\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os",
+							"host": ["{{base_url}}"],
+							"path": ["os"]
+						},
+						"description": "Passo 1: Operador cria OS com prioridade crítica."
+					},
+					"response": []
+				},
+				{
+					"name": "2. Aceitar OS",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-003\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/3/aceitar",
+							"host": ["{{base_url}}"],
+							"path": ["os", "3", "aceitar"]
+						},
+						"description": "Passo 2: Técnico aceita a OS. Status: aberta → aceita."
+					},
+					"response": []
+				},
+				{
+					"name": "3. Iniciar execução",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-003\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/3/iniciar",
+							"host": ["{{base_url}}"],
+							"path": ["os", "3", "iniciar"]
+						},
+						"description": "Passo 3: Técnico inicia a execução. Status: aceita → em_andamento."
+					},
+					"response": []
+				},
+				{
+					"name": "4. Registrar material utilizado",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nome\": \"Transmissor de temperatura Rosemount 3144P\",\n  \"quantidade\": 1\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/3/materiais",
+							"host": ["{{base_url}}"],
+							"path": ["os", "3", "materiais"]
+						},
+						"description": "Passo 4: Técnico registra material utilizado na manutenção."
+					},
+					"response": []
+				},
+				{
+					"name": "5. Concluir com laudo",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tecnico_id\": \"tec-003\",\n  \"laudo\": \"Transmissor TT-205 apresentava drift no sinal 4-20mA. Substituído por transmissor novo Rosemount 3144P. Calibração verificada com simulador de termopar. Leitura estabilizada em 180°C conforme processo. Equipamento liberado.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/os/3/concluir",
+							"host": ["{{base_url}}"],
+							"path": ["os", "3", "concluir"]
+						},
+						"description": "Passo 5: Técnico conclui a OS com laudo técnico. Status: em_andamento → concluida."
+					},
+					"response": []
+				},
+				{
+					"name": "6. Verificar estado final",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os/3",
+							"host": ["{{base_url}}"],
+							"path": ["os", "3"]
+						},
+						"description": "Passo 6: Verifica o estado final da OS com todos os campos preenchidos."
+					},
+					"response": []
+				},
+				{
+					"name": "7. Verificar materiais registrados",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/os/3/materiais",
+							"host": ["{{base_url}}"],
+							"path": ["os", "3", "materiais"]
+						},
+						"description": "Passo 7: Lista os materiais utilizados na OS concluída."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

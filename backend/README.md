@@ -53,4 +53,3 @@ API disponível em `http://localhost:5000`.
 | Variável | Default | Descrição |
 |---|---|---|
 | RABBITMQ_HOST | localhost | Host do RabbitMQ |
-| FLASK_PORT | 5000 | Porta da API |

@@ -3,14 +3,12 @@ from app.models.material import Material
 from app.messaging.publisher import publish_event
 
 
-# Mapa de transições válidas: status_atual -> [status_permitidos]
 TRANSICOES_VALIDAS = {
     'aberta': ['aceita', 'recusada'],
     'aceita': ['em_andamento'],
     'em_andamento': ['concluida'],
 }
 
-# Mapa de routing keys para cada transição
 EVENTO_POR_STATUS = {
     'aceita': 'os.aceita',
     'recusada': 'os.recusada',
@@ -40,11 +38,10 @@ class OSService:
         except ValueError as e:
             return None, str(e)
 
-        # Publica evento de criação
         try:
             publish_event('os.criada', os_criada)
         except Exception:
-            pass  # Falha no RabbitMQ não impede a criação
+            pass
 
         return os_criada, None
 
@@ -69,7 +66,6 @@ class OSService:
             erro = f"Transição inválida. Status atual: {status_atual}. Esperado: {', '.join(transicoes_permitidas) if transicoes_permitidas else 'nenhuma transição possível'}"
             return None, erro, 409
 
-        # Validações específicas
         if not tecnico_id:
             return None, "Campo obrigatório ausente: tecnico_id", 400
 
@@ -83,12 +79,11 @@ class OSService:
             laudo=laudo
         )
 
-        # Publica evento correspondente
         try:
             routing_key = EVENTO_POR_STATUS[novo_status]
             publish_event(routing_key, os_atualizada)
         except Exception:
-            pass  # Falha no RabbitMQ não impede a transição
+            pass
 
         return os_atualizada, None, 200
 
@@ -100,8 +95,10 @@ class OSService:
 
         if 'nome' not in dados or not dados['nome']:
             return None, "Campo obrigatório ausente: nome", 400
-        if 'quantidade' not in dados or not dados['quantidade']:
+        if 'quantidade' not in dados:
             return None, "Campo obrigatório ausente: quantidade", 400
+        if not isinstance(dados['quantidade'], int) or dados['quantidade'] <= 0:
+            return None, "quantidade deve ser um inteiro maior que zero", 400
 
         try:
             material = Material.criar(

@@ -1,6 +1,3 @@
-# PlantOS Backend - Flask Application
-# Entry point for the backend API
-
 from app import create_app
 
 app = create_app()

@@ -132,6 +132,7 @@ Esses dados ficam vinculados à OS e disponíveis para consulta pelo operador.
 | `GET` | `/os/<id>` | Consultar OS por ID |
 | `PATCH` | `/os/<id>/aceitar` | Técnico aceita a OS |
 | `PATCH` | `/os/<id>/recusar` | Técnico recusa a OS |
+| `PATCH` | `/os/<id>/iniciar` | Técnico inicia a execução da OS |
 | `PATCH` | `/os/<id>/concluir` | Técnico conclui a OS com laudo |
 | `POST` | `/os/<id>/materiais` | Registrar materiais utilizados |
 | `GET` | `/os/<id>/materiais` | Listar materiais de uma OS |

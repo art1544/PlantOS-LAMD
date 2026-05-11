@@ -42,8 +42,3 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-
-def close_connection(conn):
-    if conn:
-        conn.close()
