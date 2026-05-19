@@ -38,6 +38,35 @@ def init_db():
             quantidade INTEGER NOT NULL CHECK(quantidade > 0),
             FOREIGN KEY (ordem_servico_id) REFERENCES ordem_servico(id)
         );
+
+        CREATE TRIGGER IF NOT EXISTS trg_ordem_servico_atualizado_em
+        AFTER UPDATE ON ordem_servico
+        FOR EACH ROW
+        BEGIN
+            UPDATE ordem_servico
+            SET atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = OLD.id;
+        END;
+                         
+         CREATE TABLE IF NOT EXISTS usuario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            login TEXT NOT NULL UNIQUE,
+            senha TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'operador' CHECK(role IN ('operador', 'tecnico', 'admin')),
+            ativo INTEGER NOT NULL DEFAULT 1 CHECK(ativo IN (0, 1)),
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );                 
+
+        CREATE TRIGGER IF NOT EXISTS trg_usuario_atualizado_em
+        AFTER UPDATE ON usuario
+        FOR EACH ROW
+        BEGIN
+            UPDATE usuario
+            SET atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = OLD.id;
+        END;
     """)
 
     conn.commit()
