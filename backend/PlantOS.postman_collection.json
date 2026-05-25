@@ -1,1072 +1,528 @@
 {
 	"info": {
 		"_postman_id": "plantos-collection-2026",
-		"name": "PlantOS — Ordens de Serviço",
-		"description": "Coleção de testes para a API REST do PlantOS.\nSistema de ordens de serviço para plantas industriais.\n\nDisciplina: Lab. de Desenvolvimento de Aplicações Móveis e Distribuídas — PUC Minas\nSprint 1 — Arquitetura e Backend REST",
+		"name": "PlantOS — Ordens de Serviço (Sprint 2)",
+		"description": "Coleção de testes para a API REST do PlantOS após Sprint 2.\n\n**Inclui:**\n* Autenticação JWT (`/auth/register`, `/auth/login`, `/auth/me`)\n* RBAC: operador, técnico, admin\n* Ordens de Serviço (CRUD + transições) — todas autenticadas\n* Materiais\n* Fluxo completo Sprint 2 (criar operador + técnico, login, criar OS, aceitar, iniciar, registrar material, concluir)\n\n**Pré-condição:** rodar `python app.py` no diretório `backend/`. Para evidência de eventos, ter o RabbitMQ rodando (`infra/docker-compose.yml`) e o worker (`python worker.py`) em paralelo.\n\nDisciplina: Lab. de Desenvolvimento de Aplicações Móveis e Distribuídas — PUC Minas",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:5000",
-			"type": "string"
-		}
+		{ "key": "base_url",  "value": "http://localhost:5000", "type": "string" },
+		{ "key": "op_token",  "value": "", "type": "string" },
+		{ "key": "tec_token", "value": "", "type": "string" },
+		{ "key": "os_id",     "value": "1", "type": "string" }
 	],
 	"item": [
 		{
-			"name": "Ordens de Serviço",
-			"description": "Endpoints de gestão de Ordens de Serviço (CRUD + transições de status)",
+			"name": "Auth",
+			"description": "Endpoints de autenticação JWT. Os scripts de teste salvam automaticamente o token na variável da coleção.",
 			"item": [
 				{
-					"name": "Criar OS — Prioridade Alta",
+					"name": "Registrar Operador",
+					"event": [
+						{
+							"listen": "test",
+							"script": { "type": "text/javascript", "exec": [
+								"pm.test('Status 201 ou 409', () => pm.expect([201,409]).to.include(pm.response.code));"
+							]}
+						}
+					],
 					"request": {
 						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras. Necessária substituição da gaxeta.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"operador_id\": \"op-001\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os",
-							"host": ["{{base_url}}"],
-							"path": ["os"]
-						},
-						"description": "Cria uma nova ordem de serviço com prioridade alta.\n\n**Campos obrigatórios:** titulo, descricao, setor, equipamento, prioridade, operador_id\n\n**Prioridades válidas:** baixa, media, alta, critica\n\n**Status inicial:** aberta"
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"Carla Operadora\",\n  \"login\": \"op-carla\",\n  \"senha\": \"senha123\",\n  \"role\": \"operador\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+						"description": "Cadastra um novo usuário com role `operador`."
 					},
 					"response": [
 						{
-							"name": "201 — OS criada com sucesso",
-							"originalRequest": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"operador_id\": \"op-001\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os",
-									"host": ["{{base_url}}"],
-									"path": ["os"]
-								}
-							},
+							"name": "201 — Operador criado",
+							"originalRequest": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"login\":\"op-carla\",\"senha\":\"senha123\",\"role\":\"operador\",\"nome\":\"Carla\"}"}, "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth","register"] } },
 							"status": "CREATED",
 							"code": 201,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"status\": \"aberta\",\n  \"operador_id\": \"op-001\",\n  \"tecnico_id\": null,\n  \"laudo\": null,\n  \"criado_em\": \"2026-05-11T20:00:00.000000Z\",\n  \"atualizado_em\": \"2026-05-11T20:00:00.000000Z\"\n}"
+							"header": [{ "key": "Content-Type", "value": "application/json" }],
+							"body": "{\n  \"id\": 1,\n  \"nome\": \"Carla Operadora\",\n  \"login\": \"op-carla\",\n  \"role\": \"operador\",\n  \"ativo\": 1,\n  \"criado_em\": \"2026-05-25T14:00:00.000000Z\",\n  \"atualizado_em\": \"2026-05-25T14:00:00.000000Z\"\n}"
 						}
 					]
 				},
 				{
-					"name": "Criar OS — Prioridade Média",
+					"name": "Registrar Técnico",
 					"request": {
 						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"titulo\": \"Motor com ruído anormal\",\n  \"descricao\": \"Motor da esteira ET-03 apresenta ruído metálico intermitente durante operação em carga máxima.\",\n  \"setor\": \"Produção\",\n  \"equipamento\": \"Esteira ET-03\",\n  \"prioridade\": \"media\",\n  \"operador_id\": \"op-002\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os",
-							"host": ["{{base_url}}"],
-							"path": ["os"]
-						},
-						"description": "Cria uma segunda OS para testar listagem e filtros."
-					},
-					"response": [
-						{
-							"name": "201 — OS criada com sucesso",
-							"originalRequest": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"titulo\": \"Motor com ruído anormal\",\n  \"descricao\": \"Motor da esteira ET-03 apresenta ruído metálico intermitente.\",\n  \"setor\": \"Produção\",\n  \"equipamento\": \"Esteira ET-03\",\n  \"prioridade\": \"media\",\n  \"operador_id\": \"op-002\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os",
-									"host": ["{{base_url}}"],
-									"path": ["os"]
-								}
-							},
-							"status": "CREATED",
-							"code": 201,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 2,\n  \"titulo\": \"Motor com ruído anormal\",\n  \"descricao\": \"Motor da esteira ET-03 apresenta ruído metálico intermitente.\",\n  \"setor\": \"Produção\",\n  \"equipamento\": \"Esteira ET-03\",\n  \"prioridade\": \"media\",\n  \"status\": \"aberta\",\n  \"operador_id\": \"op-002\",\n  \"tecnico_id\": null,\n  \"laudo\": null,\n  \"criado_em\": \"2026-05-11T20:01:00.000000Z\",\n  \"atualizado_em\": \"2026-05-11T20:01:00.000000Z\"\n}"
-						}
-					]
-				},
-				{
-					"name": "Criar OS — Erro: campo ausente",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"titulo\": \"Teste incompleto\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os",
-							"host": ["{{base_url}}"],
-							"path": ["os"]
-						},
-						"description": "Testa validação de campos obrigatórios. Deve retornar 400."
-					},
-					"response": [
-						{
-							"name": "400 — Campo obrigatório ausente",
-							"originalRequest": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"titulo\": \"Teste incompleto\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os",
-									"host": ["{{base_url}}"],
-									"path": ["os"]
-								}
-							},
-							"status": "BAD REQUEST",
-							"code": 400,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"erro\": \"Campo obrigatório ausente: descricao\"\n}"
-						}
-					]
-				},
-				{
-					"name": "Criar OS — Erro: prioridade inválida",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"titulo\": \"Teste prioridade\",\n  \"descricao\": \"Teste\",\n  \"setor\": \"Teste\",\n  \"equipamento\": \"Teste\",\n  \"prioridade\": \"urgentissima\",\n  \"operador_id\": \"op-001\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os",
-							"host": ["{{base_url}}"],
-							"path": ["os"]
-						},
-						"description": "Testa validação de prioridade inválida. Deve retornar 400."
-					},
-					"response": [
-						{
-							"name": "400 — Prioridade inválida",
-							"originalRequest": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"titulo\": \"Teste prioridade\",\n  \"descricao\": \"Teste\",\n  \"setor\": \"Teste\",\n  \"equipamento\": \"Teste\",\n  \"prioridade\": \"urgentissima\",\n  \"operador_id\": \"op-001\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os",
-									"host": ["{{base_url}}"],
-									"path": ["os"]
-								}
-							},
-							"status": "BAD REQUEST",
-							"code": 400,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"erro\": \"Prioridade inválida: urgentissima\"\n}"
-						}
-					]
-				},
-				{
-					"name": "Listar todas as OS",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os",
-							"host": ["{{base_url}}"],
-							"path": ["os"]
-						},
-						"description": "Retorna todas as ordens de serviço cadastradas, ordenadas por data de criação (mais recente primeiro)."
-					},
-					"response": [
-						{
-							"name": "200 — Lista de OS",
-							"originalRequest": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{base_url}}/os",
-									"host": ["{{base_url}}"],
-									"path": ["os"]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "[\n  {\n    \"id\": 2,\n    \"titulo\": \"Motor com ruído anormal\",\n    \"status\": \"aberta\",\n    \"prioridade\": \"media\",\n    \"operador_id\": \"op-002\"\n  },\n  {\n    \"id\": 1,\n    \"titulo\": \"Vazamento na válvula V-102\",\n    \"status\": \"aberta\",\n    \"prioridade\": \"alta\",\n    \"operador_id\": \"op-001\"\n  }\n]"
-						}
-					]
-				},
-				{
-					"name": "Listar OS por status (filtro)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os?status=aberta",
-							"host": ["{{base_url}}"],
-							"path": ["os"],
-							"query": [
-								{
-									"key": "status",
-									"value": "aberta",
-									"description": "Filtrar por status: aberta, aceita, em_andamento, concluida, recusada"
-								}
-							]
-						},
-						"description": "Lista OS filtradas por status. Parâmetros opcionais: status, operador_id."
-					},
-					"response": [
-						{
-							"name": "200 — OS filtradas por status",
-							"originalRequest": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{base_url}}/os?status=aberta",
-									"host": ["{{base_url}}"],
-									"path": ["os"],
-									"query": [
-										{
-											"key": "status",
-											"value": "aberta"
-										}
-									]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "[\n  {\n    \"id\": 1,\n    \"titulo\": \"Vazamento na válvula V-102\",\n    \"status\": \"aberta\",\n    \"prioridade\": \"alta\"\n  }\n]"
-						}
-					]
-				},
-				{
-					"name": "Listar OS por operador (filtro)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os?operador_id=op-001",
-							"host": ["{{base_url}}"],
-							"path": ["os"],
-							"query": [
-								{
-									"key": "operador_id",
-									"value": "op-001",
-									"description": "Filtrar por ID do operador"
-								}
-							]
-						},
-						"description": "Lista OS filtradas pelo operador que abriu."
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"Tomás Técnico\",\n  \"login\": \"tec-tomas\",\n  \"senha\": \"senha123\",\n  \"role\": \"tecnico\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
 					},
 					"response": []
 				},
 				{
-					"name": "Consultar OS por ID",
+					"name": "Registrar — Erro: login duplicado (409)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"Outro\",\n  \"login\": \"op-carla\",\n  \"senha\": \"senha123\",\n  \"role\": \"operador\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+					},
+					"response": [
+						{
+							"name": "409 — Login já cadastrado",
+							"originalRequest": { "method": "POST", "header": [], "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth","register"] } },
+							"status": "CONFLICT", "code": 409,
+							"header": [{ "key": "Content-Type", "value": "application/json" }],
+							"body": "{\n  \"erro\": \"Login já cadastrado\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Login — Operador (salva op_token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": { "type": "text/javascript", "exec": [
+								"const json = pm.response.json();",
+								"pm.test('Status 200', () => pm.response.to.have.status(200));",
+								"pm.test('Token retornado', () => pm.expect(json.token).to.be.a('string'));",
+								"pm.collectionVariables.set('op_token', json.token);"
+							]}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"login\": \"op-carla\",\n  \"senha\": \"senha123\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+						"description": "Faz login e armazena o token JWT em `{{op_token}}`."
+					},
+					"response": [
+						{
+							"name": "200 — Login OK",
+							"originalRequest": { "method": "POST", "header": [], "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth","login"] } },
+							"status": "OK", "code": 200,
+							"header": [{ "key": "Content-Type", "value": "application/json" }],
+							"body": "{\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"usuario\": { \"id\": 1, \"nome\": \"Carla Operadora\", \"login\": \"op-carla\", \"role\": \"operador\", \"ativo\": 1 }\n}"
+						}
+					]
+				},
+				{
+					"name": "Login — Técnico (salva tec_token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": { "type": "text/javascript", "exec": [
+								"pm.collectionVariables.set('tec_token', pm.response.json().token);"
+							]}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"login\": \"tec-tomas\",\n  \"senha\": \"senha123\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Login — Erro: senha incorreta (401)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"login\": \"op-carla\",\n  \"senha\": \"errada\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+					},
+					"response": []
+				},
+				{
+					"name": "GET /auth/me — Operador",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{op_token}}" }],
+						"url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+					},
+					"response": []
+				},
+				{
+					"name": "GET /auth/me — Sem token (401)",
 					"request": {
 						"method": "GET",
 						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os/1",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1"]
-						},
-						"description": "Retorna os detalhes completos de uma OS pelo seu ID."
+						"url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
 					},
-					"response": [
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Ordens de Serviço",
+			"description": "Todas as rotas exigem header `Authorization: Bearer <token>`.\n\n* POST /os — apenas operadores\n* PATCH /os/<id>/(aceitar|recusar|iniciar|concluir) — apenas técnicos",
+			"item": [
+				{
+					"name": "Criar OS — Operador",
+					"event": [
 						{
-							"name": "200 — OS encontrada",
-							"originalRequest": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{base_url}}/os/1",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1"]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102 do setor de caldeiras.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\",\n  \"status\": \"aberta\",\n  \"operador_id\": \"op-001\",\n  \"tecnico_id\": null,\n  \"laudo\": null,\n  \"criado_em\": \"2026-05-11T20:00:00.000000Z\",\n  \"atualizado_em\": \"2026-05-11T20:00:00.000000Z\"\n}"
+							"listen": "test",
+							"script": { "type": "text/javascript", "exec": [
+								"const json = pm.response.json();",
+								"if (json.id) pm.collectionVariables.set('os_id', json.id);"
+							]}
 						}
-					]
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{op_token}}" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"descricao\": \"Vazamento de óleo identificado na base da válvula V-102.\",\n  \"setor\": \"Caldeiras\",\n  \"equipamento\": \"Válvula V-102\",\n  \"prioridade\": \"alta\"\n}" },
+						"url": { "raw": "{{base_url}}/os", "host": ["{{base_url}}"], "path": ["os"] },
+						"description": "O `operador_id` é derivado do token JWT (não vai no body). Status inicial: `aberta`. Publica evento `os.criada` na `fila.tecnico`."
+					},
+					"response": []
 				},
 				{
-					"name": "Consultar OS — Erro: não encontrada",
+					"name": "Criar OS — Erro: sem token (401)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"titulo\": \"X\",\n  \"descricao\": \"d\",\n  \"setor\": \"s\",\n  \"equipamento\": \"e\",\n  \"prioridade\": \"alta\"\n}" },
+						"url": { "raw": "{{base_url}}/os", "host": ["{{base_url}}"], "path": ["os"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Criar OS — Erro: técnico não pode criar (403)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"titulo\": \"X\",\n  \"descricao\": \"d\",\n  \"setor\": \"s\",\n  \"equipamento\": \"e\",\n  \"prioridade\": \"alta\"\n}" },
+						"url": { "raw": "{{base_url}}/os", "host": ["{{base_url}}"], "path": ["os"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Criar OS — Erro: campo obrigatório (400)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{op_token}}" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"titulo\": \"incompleto\"\n}" },
+						"url": { "raw": "{{base_url}}/os", "host": ["{{base_url}}"], "path": ["os"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Listar OS — Operador",
 					"request": {
 						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os/999",
-							"host": ["{{base_url}}"],
-							"path": ["os", "999"]
-						},
-						"description": "Testa consulta de OS inexistente. Deve retornar 404."
+						"header": [{ "key": "Authorization", "value": "Bearer {{op_token}}" }],
+						"url": { "raw": "{{base_url}}/os", "host": ["{{base_url}}"], "path": ["os"] }
 					},
-					"response": [
-						{
-							"name": "404 — OS não encontrada",
-							"originalRequest": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{base_url}}/os/999",
-									"host": ["{{base_url}}"],
-									"path": ["os", "999"]
-								}
-							},
-							"status": "NOT FOUND",
-							"code": 404,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"erro\": \"OS não encontrada\"\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Aceitar OS",
+					"name": "Listar OS — Técnico",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{tec_token}}" }],
+						"url": { "raw": "{{base_url}}/os", "host": ["{{base_url}}"], "path": ["os"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Listar OS — filtro por status",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{tec_token}}" }],
+						"url": {
+							"raw": "{{base_url}}/os?status=aberta",
+							"host": ["{{base_url}}"], "path": ["os"],
+							"query": [{ "key": "status", "value": "aberta" }]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar OS por ID",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{op_token}}" }],
+						"url": { "raw": "{{base_url}}/os/{{os_id}}", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar OS — 404",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{op_token}}" }],
+						"url": { "raw": "{{base_url}}/os/9999", "host": ["{{base_url}}"], "path": ["os", "9999"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Aceitar OS — Técnico",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/1/aceitar",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "aceitar"]
-						},
-						"description": "Técnico aceita uma OS aberta.\n\n**Pré-condição:** OS com status `aberta`\n**Pós-condição:** Status muda para `aceita`, tecnico_id é preenchido\n\n**Campo obrigatório:** tecnico_id"
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/aceitar", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "aceitar"] },
+						"description": "`tecnico_id` é derivado do token. Publica evento `os.aceita` na `fila.operador`."
 					},
-					"response": [
-						{
-							"name": "200 — OS aceita",
-							"originalRequest": {
-								"method": "PATCH",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/1/aceitar",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "aceitar"]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"status\": \"aceita\",\n  \"tecnico_id\": \"tec-001\",\n  \"atualizado_em\": \"2026-05-11T20:05:00.000000Z\"\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Recusar OS",
+					"name": "Recusar OS — Técnico",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-002\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/2/recusar",
-							"host": ["{{base_url}}"],
-							"path": ["os", "2", "recusar"]
-						},
-						"description": "Técnico recusa uma OS aberta.\n\n**Pré-condição:** OS com status `aberta`\n**Pós-condição:** Status muda para `recusada`, tecnico_id é preenchido\n\n**Campo obrigatório:** tecnico_id"
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/recusar", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "recusar"] }
 					},
-					"response": [
-						{
-							"name": "200 — OS recusada",
-							"originalRequest": {
-								"method": "PATCH",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"tecnico_id\": \"tec-002\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/2/recusar",
-									"host": ["{{base_url}}"],
-									"path": ["os", "2", "recusar"]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 2,\n  \"titulo\": \"Motor com ruído anormal\",\n  \"status\": \"recusada\",\n  \"tecnico_id\": \"tec-002\",\n  \"atualizado_em\": \"2026-05-11T20:06:00.000000Z\"\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Iniciar execução da OS",
+					"name": "Iniciar OS — Técnico",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/1/iniciar",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "iniciar"]
-						},
-						"description": "Técnico inicia a execução de uma OS aceita.\n\n**Pré-condição:** OS com status `aceita`\n**Pós-condição:** Status muda para `em_andamento`\n\n**Campo obrigatório:** tecnico_id"
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/iniciar", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "iniciar"] }
 					},
-					"response": [
-						{
-							"name": "200 — OS em andamento",
-							"originalRequest": {
-								"method": "PATCH",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/1/iniciar",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "iniciar"]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"status\": \"em_andamento\",\n  \"tecnico_id\": \"tec-001\",\n  \"atualizado_em\": \"2026-05-11T20:10:00.000000Z\"\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Concluir OS com laudo",
+					"name": "Concluir OS — Técnico (com laudo)",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-001\",\n  \"laudo\": \"Substituída gaxeta desgastada na válvula V-102 e realizado torque nos parafusos de fixação conforme especificação do fabricante. Vazamento completamente eliminado. Equipamento liberado para operação.\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/1/concluir",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "concluir"]
-						},
-						"description": "Técnico conclui a OS registrando o laudo técnico.\n\n**Pré-condição:** OS com status `em_andamento`\n**Pós-condição:** Status muda para `concluida`, laudo é preenchido\n\n**Campos obrigatórios:** tecnico_id, laudo"
+						"body": { "mode": "raw", "raw": "{\n  \"laudo\": \"Substituída gaxeta desgastada. Vazamento eliminado.\"\n}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/concluir", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "concluir"] }
 					},
-					"response": [
-						{
-							"name": "200 — OS concluída",
-							"originalRequest": {
-								"method": "PATCH",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"tecnico_id\": \"tec-001\",\n  \"laudo\": \"Substituída gaxeta desgastada. Vazamento corrigido.\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/1/concluir",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "concluir"]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 1,\n  \"titulo\": \"Vazamento na válvula V-102\",\n  \"status\": \"concluida\",\n  \"tecnico_id\": \"tec-001\",\n  \"laudo\": \"Substituída gaxeta desgastada. Vazamento corrigido.\",\n  \"atualizado_em\": \"2026-05-11T20:15:00.000000Z\"\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Concluir OS — Erro: sem laudo",
+					"name": "Aceitar OS — Erro: operador não pode (403)",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{op_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/1/concluir",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "concluir"]
-						},
-						"description": "Testa conclusão sem laudo. Deve retornar 400."
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/aceitar", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "aceitar"] }
 					},
-					"response": [
-						{
-							"name": "400 — Laudo obrigatório",
-							"originalRequest": {
-								"method": "PATCH",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/1/concluir",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "concluir"]
-								}
-							},
-							"status": "BAD REQUEST",
-							"code": 400,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"erro\": \"Campo obrigatório ausente: laudo\"\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Transição inválida — Erro 409",
+					"name": "Transição inválida (409)",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/1/aceitar",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "aceitar"]
-						},
-						"description": "Testa transição de status inválida (ex: aceitar OS já concluída). Deve retornar 409 Conflict."
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/iniciar", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "iniciar"] },
+						"description": "Tentar iniciar uma OS já concluída → 409."
 					},
-					"response": [
-						{
-							"name": "409 — Transição inválida",
-							"originalRequest": {
-								"method": "PATCH",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"tecnico_id\": \"tec-001\"\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/1/aceitar",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "aceitar"]
-								}
-							},
-							"status": "CONFLICT",
-							"code": 409,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"erro\": \"Transição inválida. Status atual: concluida. Esperado: nenhuma transição possível\"\n}"
-						}
-					]
+					"response": []
 				}
 			]
 		},
 		{
 			"name": "Materiais",
-			"description": "Endpoints de registro e consulta de materiais utilizados em cada OS",
 			"item": [
 				{
-					"name": "Registrar material na OS",
+					"name": "Registrar material — Técnico",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"nome\": \"Gaxeta 3/4\\\"\",\n  \"quantidade\": 2\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/1/materiais",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "materiais"]
-						},
-						"description": "Registra um material utilizado na execução de uma OS.\n\n**Campos obrigatórios:** nome, quantidade (inteiro > 0)\n\n**Pré-condição:** OS deve existir"
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"Gaxeta 3/4\\\"\",\n  \"quantidade\": 2\n}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/materiais", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "materiais"] }
 					},
-					"response": [
-						{
-							"name": "201 — Material registrado",
-							"originalRequest": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"nome\": \"Gaxeta 3/4\\\"\",\n  \"quantidade\": 2\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/1/materiais",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "materiais"]
-								}
-							},
-							"status": "CREATED",
-							"code": 201,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 1,\n  \"ordem_servico_id\": 1,\n  \"nome\": \"Gaxeta 3/4\\\"\",\n  \"quantidade\": 2\n}"
-						}
-					]
+					"response": []
 				},
 				{
-					"name": "Registrar segundo material",
+					"name": "Listar materiais",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{op_token}}" }],
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/materiais", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "materiais"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Registrar material — Erro: quantidade zero (400)",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"nome\": \"Parafuso M10 x 30mm\",\n  \"quantidade\": 4\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/1/materiais",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "materiais"]
-						},
-						"description": "Registra um segundo material para demonstrar listagem múltipla."
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"x\",\n  \"quantidade\": 0\n}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/materiais", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "materiais"] }
 					},
-					"response": [
-						{
-							"name": "201 — Material registrado",
-							"originalRequest": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n  \"nome\": \"Parafuso M10 x 30mm\",\n  \"quantidade\": 4\n}"
-								},
-								"url": {
-									"raw": "{{base_url}}/os/1/materiais",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "materiais"]
-								}
-							},
-							"status": "CREATED",
-							"code": 201,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"id\": 2,\n  \"ordem_servico_id\": 1,\n  \"nome\": \"Parafuso M10 x 30mm\",\n  \"quantidade\": 4\n}"
-						}
-					]
-				},
-				{
-					"name": "Listar materiais da OS",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os/1/materiais",
-							"host": ["{{base_url}}"],
-							"path": ["os", "1", "materiais"]
-						},
-						"description": "Lista todos os materiais registrados em uma OS."
-					},
-					"response": [
-						{
-							"name": "200 — Lista de materiais",
-							"originalRequest": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{base_url}}/os/1/materiais",
-									"host": ["{{base_url}}"],
-									"path": ["os", "1", "materiais"]
-								}
-							},
-							"status": "OK",
-							"code": 200,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "[\n  {\n    \"id\": 1,\n    \"ordem_servico_id\": 1,\n    \"nome\": \"Gaxeta 3/4\\\"\",\n    \"quantidade\": 2\n  },\n  {\n    \"id\": 2,\n    \"ordem_servico_id\": 1,\n    \"nome\": \"Parafuso M10 x 30mm\",\n    \"quantidade\": 4\n  }\n]"
-						}
-					]
-				},
-				{
-					"name": "Listar materiais — Erro: OS inexistente",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os/999/materiais",
-							"host": ["{{base_url}}"],
-							"path": ["os", "999", "materiais"]
-						},
-						"description": "Testa listagem de materiais de OS inexistente. Deve retornar 404."
-					},
-					"response": [
-						{
-							"name": "404 — OS não encontrada",
-							"originalRequest": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{base_url}}/os/999/materiais",
-									"host": ["{{base_url}}"],
-									"path": ["os", "999", "materiais"]
-								}
-							},
-							"status": "NOT FOUND",
-							"code": 404,
-							"header": [
-								{
-									"key": "Content-Type",
-									"value": "application/json"
-								}
-							],
-							"body": "{\n  \"erro\": \"OS não encontrada\"\n}"
-						}
-					]
+					"response": []
 				}
 			]
 		},
 		{
-			"name": "Fluxo Completo (Execução Sequencial)",
-			"description": "Execute esta pasta na ordem para simular o fluxo completo:\n1. Criar OS\n2. Aceitar OS\n3. Iniciar execução\n4. Registrar materiais\n5. Concluir com laudo\n6. Verificar estado final",
+			"name": "Fluxo Completo Sprint 2",
+			"description": "Executar em sequência (Runner do Postman) para demonstrar:\n\n1-2. Cadastro de operador e técnico\n3-4. Login (popula op_token e tec_token automaticamente)\n5. Operador cria OS → publica `os.criada` em `fila.tecnico`\n6. Técnico aceita → publica `os.aceita` em `fila.operador`\n7. Técnico inicia → publica `os.em_andamento`\n8. Técnico registra material\n9. Técnico conclui com laudo → publica `os.concluida`\n10. Verifica estado final\n\nCom o worker rodando (`python backend/worker.py`) os 4 eventos aparecem no console e na tabela `evento_log`.",
 			"item": [
 				{
-					"name": "1. Criar OS (Crítica)",
+					"name": "1. Registrar Operador (idempotente)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"Demo Operador\",\n  \"login\": \"demo-op\",\n  \"senha\": \"senha123\",\n  \"role\": \"operador\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+					},
+					"response": []
+				},
+				{
+					"name": "2. Registrar Técnico (idempotente)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"Demo Técnico\",\n  \"login\": \"demo-tec\",\n  \"senha\": \"senha123\",\n  \"role\": \"tecnico\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+					},
+					"response": []
+				},
+				{
+					"name": "3. Login Operador",
+					"event": [
+						{
+							"listen": "test",
+							"script": { "type": "text/javascript", "exec": [
+								"pm.collectionVariables.set('op_token', pm.response.json().token);"
+							]}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"login\": \"demo-op\",\n  \"senha\": \"senha123\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+					},
+					"response": []
+				},
+				{
+					"name": "4. Login Técnico",
+					"event": [
+						{
+							"listen": "test",
+							"script": { "type": "text/javascript", "exec": [
+								"pm.collectionVariables.set('tec_token', pm.response.json().token);"
+							]}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"login\": \"demo-tec\",\n  \"senha\": \"senha123\"\n}" },
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+					},
+					"response": []
+				},
+				{
+					"name": "5. Criar OS (Operador) — publica os.criada",
+					"event": [
+						{
+							"listen": "test",
+							"script": { "type": "text/javascript", "exec": [
+								"pm.collectionVariables.set('os_id', pm.response.json().id);"
+							]}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{op_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"titulo\": \"Sensor de temperatura fora de faixa\",\n  \"descricao\": \"Sensor TT-205 do reator R-01 está reportando leitura de 450°C quando o processo opera a 180°C. Possível falha no transmissor.\",\n  \"setor\": \"Reatores\",\n  \"equipamento\": \"Sensor TT-205 / Reator R-01\",\n  \"prioridade\": \"critica\",\n  \"operador_id\": \"op-003\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os",
-							"host": ["{{base_url}}"],
-							"path": ["os"]
-						},
-						"description": "Passo 1: Operador cria OS com prioridade crítica."
+						"body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Sensor TT-205 fora de faixa\",\n  \"descricao\": \"Sensor de temperatura reportando 450°C em processo de 180°C.\",\n  \"setor\": \"Reatores\",\n  \"equipamento\": \"Sensor TT-205\",\n  \"prioridade\": \"critica\"\n}" },
+						"url": { "raw": "{{base_url}}/os", "host": ["{{base_url}}"], "path": ["os"] }
 					},
 					"response": []
 				},
 				{
-					"name": "2. Aceitar OS",
+					"name": "6. Aceitar OS (Técnico) — publica os.aceita",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-003\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/3/aceitar",
-							"host": ["{{base_url}}"],
-							"path": ["os", "3", "aceitar"]
-						},
-						"description": "Passo 2: Técnico aceita a OS. Status: aberta → aceita."
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/aceitar", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "aceitar"] }
 					},
 					"response": []
 				},
 				{
-					"name": "3. Iniciar execução",
+					"name": "7. Iniciar OS (Técnico) — publica os.em_andamento",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-003\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/3/iniciar",
-							"host": ["{{base_url}}"],
-							"path": ["os", "3", "iniciar"]
-						},
-						"description": "Passo 3: Técnico inicia a execução. Status: aceita → em_andamento."
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/iniciar", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "iniciar"] }
 					},
 					"response": []
 				},
 				{
-					"name": "4. Registrar material utilizado",
+					"name": "8. Registrar material (Técnico)",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"nome\": \"Transmissor de temperatura Rosemount 3144P\",\n  \"quantidade\": 1\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/3/materiais",
-							"host": ["{{base_url}}"],
-							"path": ["os", "3", "materiais"]
-						},
-						"description": "Passo 4: Técnico registra material utilizado na manutenção."
+						"body": { "mode": "raw", "raw": "{\n  \"nome\": \"Transmissor Rosemount 3144P\",\n  \"quantidade\": 1\n}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/materiais", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "materiais"] }
 					},
 					"response": []
 				},
 				{
-					"name": "5. Concluir com laudo",
+					"name": "9. Concluir OS com laudo — publica os.concluida",
 					"request": {
 						"method": "PATCH",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{tec_token}}" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tecnico_id\": \"tec-003\",\n  \"laudo\": \"Transmissor TT-205 apresentava drift no sinal 4-20mA. Substituído por transmissor novo Rosemount 3144P. Calibração verificada com simulador de termopar. Leitura estabilizada em 180°C conforme processo. Equipamento liberado.\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/os/3/concluir",
-							"host": ["{{base_url}}"],
-							"path": ["os", "3", "concluir"]
-						},
-						"description": "Passo 5: Técnico conclui a OS com laudo técnico. Status: em_andamento → concluida."
+						"body": { "mode": "raw", "raw": "{\n  \"laudo\": \"Transmissor substituído. Calibração verificada. Equipamento liberado.\"\n}" },
+						"url": { "raw": "{{base_url}}/os/{{os_id}}/concluir", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}", "concluir"] }
 					},
 					"response": []
 				},
 				{
-					"name": "6. Verificar estado final",
+					"name": "10. Verificar estado final",
 					"request": {
 						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os/3",
-							"host": ["{{base_url}}"],
-							"path": ["os", "3"]
-						},
-						"description": "Passo 6: Verifica o estado final da OS com todos os campos preenchidos."
-					},
-					"response": []
-				},
-				{
-					"name": "7. Verificar materiais registrados",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/os/3/materiais",
-							"host": ["{{base_url}}"],
-							"path": ["os", "3", "materiais"]
-						},
-						"description": "Passo 7: Lista os materiais utilizados na OS concluída."
+						"header": [{ "key": "Authorization", "value": "Bearer {{op_token}}" }],
+						"url": { "raw": "{{base_url}}/os/{{os_id}}", "host": ["{{base_url}}"], "path": ["os", "{{os_id}}"] }
 					},
 					"response": []
 				}

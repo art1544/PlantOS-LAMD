@@ -67,6 +67,17 @@ def init_db():
             SET atualizado_em = CURRENT_TIMESTAMP
             WHERE id = OLD.id;
         END;
+
+        -- Tabela de auditoria de eventos consumidos do RabbitMQ (Sprint 2).
+        -- Cada linha representa uma mensagem efetivamente processada pelo
+        -- worker consumidor, comprovando a comunicação assíncrona via MOM.
+        CREATE TABLE IF NOT EXISTS evento_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fila TEXT NOT NULL,
+            routing_key TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            recebido_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
     """)
 
     conn.commit()

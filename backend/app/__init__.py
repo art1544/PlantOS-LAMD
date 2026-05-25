@@ -10,7 +10,13 @@ def create_app():
     init_db()
 
     from app.routes.os_routes import os_bp
+    from app.routes.auth_routes import auth_bp
     app.register_blueprint(os_bp)
+    app.register_blueprint(auth_bp)
+
+    @app.route('/health', methods=['GET'])
+    def health():
+        return {"status": "ok", "service": "plantos-api"}, 200
 
     try:
         from app.messaging.publisher import setup_queues
