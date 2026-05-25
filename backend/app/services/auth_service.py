@@ -1,5 +1,3 @@
-"""Camada de serviço de autenticação: cadastro e login."""
-
 import sqlite3
 
 from app.auth import generate_token, hash_password, verify_password

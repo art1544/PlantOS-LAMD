@@ -1,17 +1,3 @@
-"""
-Suite de testes automatizados — PlantOS Sprint 2.
-
-Cobertura:
-  * Autenticação: registro, login, /me, controle de acesso por role
-  * Ordens de Serviço: CRUD, transições válidas/inválidas, 401/403/404/409
-  * Materiais: registro, listagem, validações
-  * Eventos: publish_event é chamado nos momentos corretos do fluxo
-  * Fluxo completo ponta-a-ponta (operador → técnico → conclusão)
-
-Os testes NÃO exigem RabbitMQ rodando: o `publish_event` é mockado para
-verificar QUAIS eventos foram publicados, sem realmente conectar via AMQP.
-"""
-
 from __future__ import annotations
 
 import os
@@ -22,7 +8,6 @@ from unittest.mock import patch
 
 import pytest
 
-# Garante que o pacote `app` seja importável a partir de backend/
 BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
@@ -30,15 +15,12 @@ if BACKEND_DIR not in sys.path:
 
 @pytest.fixture()
 def app_client(monkeypatch):
-    """Cria uma app Flask isolada com banco SQLite em arquivo temporário."""
     tmp_db = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
     tmp_db.close()
 
-    # Redireciona o caminho do banco antes de importar módulos que o usam
     import app.database as database_mod
     monkeypatch.setattr(database_mod, 'DATABASE_PATH', tmp_db.name)
 
-    # Recarrega módulos que possam ter cacheado o path antigo
     for modname in [
         'app.models.usuario',
         'app.models.ordem_servico',
@@ -47,7 +29,6 @@ def app_client(monkeypatch):
         if modname in sys.modules:
             importlib.reload(sys.modules[modname])
 
-    # Mock do publisher: evita conexão real ao RabbitMQ e captura eventos
     eventos_publicados: list[tuple[str, dict]] = []
 
     def _fake_publish(routing_key, payload):
@@ -55,7 +36,6 @@ def app_client(monkeypatch):
 
     monkeypatch.setattr('app.messaging.publisher.publish_event', _fake_publish)
     monkeypatch.setattr('app.services.os_service.publish_event', _fake_publish)
-    # setup_queues também não deve abrir conexão durante o create_app
     monkeypatch.setattr('app.messaging.publisher.setup_queues', lambda: None)
 
     from app import create_app
@@ -63,14 +43,11 @@ def app_client(monkeypatch):
     app.config['TESTING'] = True
 
     client = app.test_client()
-    client.eventos = eventos_publicados  # type: ignore[attr-defined]
+    client.eventos = eventos_publicados
 
     yield client
 
     os.unlink(tmp_db.name)
-
-
-# ---------- Helpers ----------
 
 
 def _register(client, login, senha, role, nome=None):
@@ -100,8 +77,6 @@ def _seed_users(client):
     return op_token, tec_token
 
 
-# ---------- Autenticação ----------
-
 
 class TestAuth:
 
@@ -116,7 +91,7 @@ class TestAuth:
         body = r.get_json()
         assert body['login'] == 'novo'
         assert body['role'] == 'operador'
-        assert 'senha' not in body  # nunca expor hash
+        assert 'senha' not in body
 
     def test_registrar_duplicado_409(self, app_client):
         _register(app_client, 'dup', 'segredo1', 'operador')
@@ -151,10 +126,6 @@ class TestAuth:
         r = app_client.get('/auth/me', headers={'Authorization': 'Bearer abc.invalid.token'})
         assert r.status_code == 401
 
-
-# ---------- Autorização (RBAC) ----------
-
-
 class TestRBAC:
 
     def test_operador_nao_pode_aceitar_os(self, app_client):
@@ -179,10 +150,6 @@ class TestRBAC:
         assert r.status_code == 201, r.get_json()
         return r.get_json()['id']
 
-
-# ---------- Ordens de Serviço ----------
-
-
 class TestOS:
 
     def test_criar_os_publica_evento(self, app_client):
@@ -196,7 +163,6 @@ class TestOS:
         assert body['status'] == 'aberta'
         assert body['operador_id'].startswith('user-')
 
-        # Evento os.criada foi publicado
         eventos = [e[0] for e in app_client.eventos]
         assert 'os.criada' in eventos
 
@@ -221,7 +187,6 @@ class TestOS:
     def test_transicao_invalida_409(self, app_client):
         op_token, tec_token = _seed_users(app_client)
         os_id = _criar_os_default(app_client, op_token)
-        # tenta iniciar antes de aceitar
         r = app_client.patch(f'/os/{os_id}/iniciar', headers=_auth_header(tec_token), json={})
         assert r.status_code == 409
 
@@ -232,10 +197,6 @@ class TestOS:
         app_client.patch(f'/os/{os_id}/iniciar', headers=_auth_header(tec_token), json={})
         r = app_client.patch(f'/os/{os_id}/concluir', headers=_auth_header(tec_token), json={})
         assert r.status_code == 400
-
-
-# ---------- Materiais ----------
-
 
 class TestMateriais:
 
@@ -257,10 +218,6 @@ class TestMateriais:
         r = app_client.post(f'/os/{os_id}/materiais', headers=_auth_header(tec_token),
                             json={'nome': 'x', 'quantidade': 0})
         assert r.status_code == 400
-
-
-# ---------- Fluxo ponta-a-ponta ----------
-
 
 class TestFluxoCompleto:
 
@@ -292,10 +249,6 @@ class TestFluxoCompleto:
         assert r.status_code == 200
         eventos = [e[0] for e in app_client.eventos]
         assert 'os.recusada' in eventos
-
-
-# ---------- Helpers compartilhados ----------
-
 
 def _criar_os_default(client, token):
     r = client.post('/os', headers=_auth_header(token), json={

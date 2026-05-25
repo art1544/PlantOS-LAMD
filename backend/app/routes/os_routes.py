@@ -1,17 +1,3 @@
-"""Rotas REST de Ordens de Serviço.
-
-Sprint 2: todas as rotas exigem autenticação JWT.
-
-* `POST /os`                       — apenas perfil `operador`. operador_id é
-                                     extraído do token (não pode ser falsificado).
-* `GET /os`, `GET /os/<id>`        — qualquer usuário autenticado.
-* `PATCH /os/<id>/aceitar|recusar|
-  iniciar|concluir`                — apenas perfil `tecnico`. tecnico_id é
-                                     extraído do token.
-* `POST /os/<id>/materiais`        — apenas perfil `tecnico`.
-* `GET  /os/<id>/materiais`        — qualquer usuário autenticado.
-"""
-
 from flask import Blueprint, request, jsonify, g
 
 from app.auth import requires_auth, requires_role
@@ -21,7 +7,6 @@ os_bp = Blueprint('os', __name__)
 
 
 def _current_actor_id() -> str:
-    """ID estável para usar como operador_id/tecnico_id no domínio."""
     return f"user-{g.current_user['id']}"
 
 

@@ -1,5 +1,3 @@
-"""Modelo Usuario — CRUD da tabela `usuario` no SQLite."""
-
 from app.database import get_connection
 from datetime import datetime, timezone
 
@@ -68,5 +66,4 @@ class Usuario:
 
     @staticmethod
     def to_public_dict(user: dict) -> dict:
-        """Remove campos sensíveis (hash de senha) antes de serializar para o cliente."""
         return {k: v for k, v in user.items() if k != 'senha'}

@@ -68,9 +68,6 @@ def init_db():
             WHERE id = OLD.id;
         END;
 
-        -- Tabela de auditoria de eventos consumidos do RabbitMQ (Sprint 2).
-        -- Cada linha representa uma mensagem efetivamente processada pelo
-        -- worker consumidor, comprovando a comunicação assíncrona via MOM.
         CREATE TABLE IF NOT EXISTS evento_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fila TEXT NOT NULL,

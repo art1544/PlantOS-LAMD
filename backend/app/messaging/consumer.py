@@ -1,21 +1,3 @@
-"""
-Consumidor RabbitMQ do PlantOS.
-
-Esta é a **evidência de comunicação assíncrona** exigida pela Sprint 2.
-
-O worker executa fora do processo Flask (entry-point `backend/worker.py`) e:
-
-  * Conecta às filas duráveis `fila.operador` e `fila.tecnico`
-  * Consome cada evento publicado pelo backend (sem qualquer chamada REST)
-  * Persiste o evento em uma tabela de auditoria (`evento_log`)
-  * Imprime no console um log estruturado, simulando a notificação que será
-    posteriormente entregue aos apps Flutter nas Sprints 3 e 4.
-
-Como rodar:
-    cd backend
-    python worker.py
-"""
-
 from __future__ import annotations
 
 import json
@@ -35,7 +17,6 @@ QUEUES = ('fila.operador', 'fila.tecnico')
 
 
 def _log_evento(queue: str, routing_key: str, payload: dict) -> None:
-    """Persiste evento recebido na tabela `evento_log` (auditoria)."""
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -85,15 +66,6 @@ def _build_handler(queue_name: str):
 
 
 def run(max_messages: int | None = None) -> int:
-    """
-    Inicia o consumer em loop. Bloqueia até receber SIGINT/SIGTERM.
-
-    Args:
-        max_messages: Se informado, encerra após processar N mensagens
-                      (útil para testes automatizados).
-    Returns:
-        Quantidade de mensagens processadas antes do encerramento.
-    """
     print(f" [*] Conectando ao RabbitMQ em {os.getenv('RABBITMQ_HOST', 'localhost')}...")
 
     while True:

@@ -1,5 +1,3 @@
-"""Blueprint de autenticação: registro, login e perfil do usuário autenticado."""
-
 from flask import Blueprint, request, jsonify, g
 
 from app.auth import requires_auth, requires_role

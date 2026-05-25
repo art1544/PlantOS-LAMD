@@ -1,24 +1,3 @@
-"""
-Teste de integração end-to-end com RabbitMQ REAL.
-
-Diferentemente de `tests/test_api.py` (que mocka o publisher), este script:
-
-  1. Publica um evento no exchange `plantos.events` via `publish_event()`
-  2. Inicia o consumer em paralelo
-  3. Verifica que a mensagem foi consumida e gravada na tabela `evento_log`
-
-PRÉ-REQUISITOS:
-  * RabbitMQ rodando em localhost:5672 (subir via `infra/docker-compose.yml`)
-  * Dependências instaladas (`pip install -r requirements.txt`)
-
-EXECUÇÃO:
-    cd backend
-    python tests/integration_rabbitmq.py
-
-Este script gera evidência objetiva (saída + linhas em `evento_log`) que pode
-ser usada para comprovar a comunicação assíncrona exigida pela Sprint 2.
-"""
-
 from __future__ import annotations
 
 import json
@@ -54,7 +33,6 @@ def main() -> int:
     init_db()
     setup_queues()
 
-    # Limpa o histórico de evento_log para uma evidência limpa
     conn = get_connection()
     conn.execute("DELETE FROM evento_log")
     conn.commit()
@@ -65,7 +43,7 @@ def main() -> int:
         target=run_consumer, kwargs={'max_messages': 1}, daemon=True
     )
     consumer_thread.start()
-    time.sleep(2)  # tempo para o consumer assinar as filas
+    time.sleep(2)
 
     print("[3/5] Publicando evento os.criada...")
     payload = {
