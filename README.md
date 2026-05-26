@@ -294,7 +294,7 @@ flutter run
 | Sprint | Foco | Entregas | Prazo |
 |---|---|---|---|
 | Sprint 1 ✅ | Proposta + Backend REST | Proposta de domínio, diagrama de arquitetura, endpoints CRUD, coleção Postman | 11/05/2026 |
-| Sprint 2 ✅ | Integração RabbitMQ (MOM) + Auth | Publisher + consumer, 5 eventos, JWT/RBAC, [eventos.md](docs/sprint2/eventos.md), [autenticacao.md](docs/sprint2/autenticacao.md), [relatório de integração](docs/sprint2/relatorio-integracao.md) | 25/05/2026 |
+| Sprint 2 ✅ | Integração RabbitMQ (MOM) + Auth | Publisher + consumer, 5 eventos, JWT/RBAC, [eventos.md](docs/sprint2/eventos.md), [autenticacao.md](docs/sprint2/autenticacao.md), [relatório de integração](docs/sprint2/relatorio-integracao.md) | 01/06/2026 |
 | Sprint 3 | App Flutter — Operador | App funcional (3+ telas), integração REST, atualização assíncrona de estado | 15/06/2026 |
 | Sprint 4 | App Flutter — Técnico + Entrega final | App prestador, fluxo ponta a ponta, screencast, relatório técnico final | 03/07/2026 |
 

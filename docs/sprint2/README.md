@@ -1,6 +1,6 @@
 # Sprint 2 — Integração com MOM + Autenticação
 
-**Prazo:** 25/05/2026  
+**Prazo:** 01/06/2026  
 **Projeto:** PlantOS
 
 ---
