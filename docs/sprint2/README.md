@@ -5,6 +5,13 @@
 
 ---
 
+## 🎬 Vídeo de Apresentação
+
+Demonstração da Sprint 2 em execução (MOM, produtor/consumidor, JWT/RBAC e testes):
+<https://youtu.be/p-_ed9gQMUk>
+
+---
+
 ## Entregas
 
 | Artefato | Arquivo | Descrição |
