@@ -1,0 +1,537 @@
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--primary:#185FA5;--primary-light:#E6F1FB;--primary-mid:#378ADD;
+--success:#3B6D11;--success-bg:#EAF3DE;
+--warning:#854F0B;--warning-bg:#FAEEDA;
+--danger:#A32D2D;--danger-bg:#FCEBEB;
+--purple:#3C3489;--purple-bg:#EEEDFE;
+--text:#1a1a1a;--text2:#5F5E5A;--text3:#888780;
+--bg:#f5f4f0;--surface:#fff;--border:#D3D1C7;
+--r:10px;--font:'IBM Plex Sans',sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);display:flex;justify-content:center;padding:16px 0;min-height:600px}
+.frame{width:min(375px,100%);background:#111;border-radius:44px;padding:10px;box-shadow:0 24px 64px rgba(0,0,0,.35),inset 0 0 0 1px #333}
+.notch{height:28px;background:#111;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:center}
+.notch-pill{width:100px;height:10px;background:#222;border-radius:5px}
+.shell{background:var(--bg);border-radius:32px;overflow:hidden;height:780px;display:flex;flex-direction:column;position:relative}
+
+.app-header{background:var(--surface);border-bottom:0.5px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:30;position:relative}
+.app-header-title{font-size:17px;font-weight:600;color:var(--text);letter-spacing:-.3px}
+.app-header-title span{color:var(--primary)}
+.hdr-actions{display:flex;gap:4px}
+.hdr-btn{width:36px;height:36px;border:none;background:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:20px;position:relative;transition:background .15s}
+.hdr-btn:hover{background:var(--bg)}
+.badge{position:absolute;top:4px;right:4px;width:16px;height:16px;background:#E24B4A;border-radius:50%;font-size:10px;font-weight:600;color:#fff;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--surface)}
+
+.body-stack{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
+
+.notif-panel{position:absolute;top:0;left:0;right:0;background:var(--surface);border-bottom:0.5px solid var(--border);z-index:25;transform:translateY(-110%);transition:transform .25s cubic-bezier(.4,0,.2,1);max-height:70%}
+.notif-panel.open{transform:translateY(0)}
+.notif-panel-inner{overflow-y:auto;max-height:calc(70vh - 50px)}
+.notif-panel-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 10px;border-bottom:0.5px solid var(--border)}
+.notif-panel-title{font-size:14px;font-weight:600;color:var(--text)}
+.notif-clear{font-size:12px;color:var(--primary);border:none;background:none;cursor:pointer;font-family:var(--font);font-weight:500}
+.notif-item{padding:12px 16px;border-bottom:0.5px solid var(--border);display:flex;gap:10px;align-items:flex-start;cursor:pointer;transition:background .15s}
+.notif-item:last-child{border-bottom:none}
+.notif-item:hover{background:var(--bg)}
+.notif-item.unread{background:#F0F5FB}
+.notif-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.notif-icon.info{background:var(--primary-light);color:var(--primary)}
+.notif-icon.ok{background:var(--success-bg);color:var(--success)}
+.notif-icon.warn{background:var(--warning-bg);color:var(--warning)}
+.notif-body{flex:1;min-width:0}
+.notif-body-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.notif-body-msg{font-size:12px;color:var(--text2);line-height:1.4}
+.notif-body-time{font-size:11px;color:var(--text3);margin-top:3px}
+.notif-unread-dot{width:7px;height:7px;border-radius:50%;background:var(--primary);margin-top:5px;flex-shrink:0}
+
+.overlay{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:20;opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.active{opacity:1;pointer-events:all}
+
+.pages{flex:1;position:relative;overflow:hidden}
+.page{display:none;flex-direction:column;height:100%;position:absolute;inset:0}
+.page.active{display:flex}
+
+.scroll-area{flex:1;overflow-y:auto;padding:14px}
+.scroll-area::-webkit-scrollbar{width:3px}
+.scroll-area::-webkit-scrollbar-thumb{background:#D3D1C7;border-radius:2px}
+
+.section-lbl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;margin-top:6px}
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.stat{background:var(--surface);border-radius:var(--r);padding:14px;border:0.5px solid var(--border)}
+.stat-n{font-size:26px;font-weight:600;color:var(--primary);line-height:1}
+.stat-l{font-size:11px;color:var(--text3);margin-top:4px;font-weight:500}
+
+.os-card{background:var(--surface);border-radius:var(--r);padding:14px;border:0.5px solid var(--border);border-left:3px solid var(--border);margin-bottom:10px;cursor:pointer;transition:border-color .15s,transform .1s}
+.os-card:active{transform:scale(.99)}
+.os-card.p-alta{border-left-color:#E24B4A}
+.os-card.p-media{border-left-color:#EF9F27}
+.os-card.p-baixa{border-left-color:#639922}
+.os-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.os-num{font-size:11px;color:var(--text3);font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.pill-aberta{background:var(--primary-light);color:#0C447C}
+.pill-aceita{background:var(--success-bg);color:#27500A}
+.pill-andamento{background:var(--warning-bg);color:#633806}
+.pill-concluida{background:var(--purple-bg);color:#26215C}
+.pill-recusada{background:var(--danger-bg);color:#791F1F}
+.os-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;line-height:1.3}
+.os-meta{display:flex;gap:10px;font-size:12px;color:var(--text2);flex-wrap:wrap}
+.os-meta span{display:flex;align-items:center;gap:3px}
+.os-meta i{font-size:13px}
+.os-footer{margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--text3)}
+
+.history-filter{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px}
+.history-filter::-webkit-scrollbar{display:none}
+.fchip{padding:6px 12px;border-radius:20px;border:0.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.fchip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+.timeline-item{display:flex;gap:12px;margin-bottom:14px;cursor:pointer}
+.tl-line{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.tl-dot.done{background:var(--success-bg);color:var(--success)}
+.tl-dot.refused{background:var(--danger-bg);color:var(--danger)}
+.tl-dot.progress{background:var(--warning-bg);color:var(--warning)}
+.tl-connector{flex:1;width:1.5px;background:var(--border);margin:3px 0}
+.tl-content{flex:1;padding-bottom:14px;min-width:0}
+.tl-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.tl-sub{font-size:12px;color:var(--text2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-date{font-size:11px;color:var(--text3)}
+
+.bottom-nav{background:var(--surface);border-top:0.5px solid var(--border);display:flex;flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 6px 12px;border:none;background:none;cursor:pointer;color:var(--text3);font-size:10px;font-weight:500;gap:3px;transition:color .15s}
+.nav-btn i{font-size:22px}
+.nav-btn.active{color:var(--primary)}
+
+.fab{position:absolute;bottom:72px;right:16px;width:52px;height:52px;border-radius:50%;background:var(--primary);color:#fff;border:none;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:10;transition:transform .15s}
+.fab:active{transform:scale(.94)}
+
+.sub-header{background:var(--surface);border-bottom:0.5px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.back-btn{width:32px;height:32px;border:none;background:none;cursor:pointer;color:var(--text2);font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:background .15s}
+.back-btn:hover{background:var(--bg)}
+.sub-header-title{font-size:15px;font-weight:600;color:var(--text)}
+
+.form-group{margin-bottom:14px}
+.form-lbl{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.4px}
+.req{color:#E24B4A}
+.form-input,.form-select,.form-textarea{width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;font-size:14px;font-family:var(--font);color:var(--text);background:var(--surface);transition:border-color .15s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--primary-mid);box-shadow:0 0 0 3px rgba(55,138,221,.12)}
+.form-textarea{resize:vertical;min-height:90px}
+.btn{padding:11px 18px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .15s,transform .1s}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--primary);color:#fff;width:100%}
+.btn-ghost{background:none;color:var(--text2);width:100%;border:0.5px solid var(--border)}
+
+.detail-block{background:var(--surface);border-radius:var(--r);border:0.5px solid var(--border);padding:14px;margin-bottom:12px}
+.detail-block-lbl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+.detail-row:last-child{border-bottom:none}
+.detail-key{color:var(--text2)}
+.detail-val{color:var(--text);font-weight:500;text-align:right;flex:1;margin-left:8px}
+
+.login-wrap{display:flex;flex-direction:column;justify-content:center;padding:24px 20px;height:100%}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
+.login-logo i{font-size:32px;color:var(--primary)}
+.login-logo-text{font-size:22px;font-weight:600;color:var(--text)}
+.login-logo-text span{color:var(--primary)}
+.login-sub{font-size:13px;color:var(--text2);margin-top:-26px;margin-bottom:32px;margin-left:42px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;color:var(--text3);text-align:center;gap:8px}
+.empty-state i{font-size:40px;color:var(--border)}
+.empty-state p{font-size:13px;line-height:1.5}
+</style>
+
+<div class="frame">
+  <div class="notch"><div class="notch-pill"></div></div>
+  <div class="shell">
+
+    <div class="app-header">
+      <span class="app-header-title">Plant<span>OS</span></span>
+      <div class="hdr-actions">
+        <button class="hdr-btn" onclick="toggleNotifPanel()" aria-label="Notificações">
+          <i class="ti ti-bell" aria-hidden="true"></i>
+          <span class="badge" id="notifBadge">2</span>
+        </button>
+        <button class="hdr-btn" onclick="logout()" aria-label="Sair">
+          <i class="ti ti-logout" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="body-stack">
+
+      <div class="overlay" id="overlay" onclick="closeNotifPanel()"></div>
+
+      <div class="notif-panel" id="notifPanel">
+        <div class="notif-panel-hdr">
+          <span class="notif-panel-title">Notificações</span>
+          <button class="notif-clear" onclick="clearNotifs()">Limpar tudo</button>
+        </div>
+        <div class="notif-panel-inner" id="notifList">
+          <div class="notif-item unread">
+            <div class="notif-icon ok"><i class="ti ti-check" aria-hidden="true"></i></div>
+            <div class="notif-body">
+              <div class="notif-body-title">OS #2026-0001 aceita</div>
+              <div class="notif-body-msg">João Silva aceitou a OS da prensa hidráulica</div>
+              <div class="notif-body-time">Há 5 minutos</div>
+            </div>
+            <div class="notif-unread-dot"></div>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-icon warn"><i class="ti ti-alert-triangle" aria-hidden="true"></i></div>
+            <div class="notif-body">
+              <div class="notif-body-title">OS #2026-0003 em andamento</div>
+              <div class="notif-body-msg">Maria Santos iniciou o serviço na Máquina CNC</div>
+              <div class="notif-body-time">Há 42 minutos</div>
+            </div>
+            <div class="notif-unread-dot"></div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-icon info"><i class="ti ti-file-description" aria-hidden="true"></i></div>
+            <div class="notif-body">
+              <div class="notif-body-title">OS #2026-0002 concluída</div>
+              <div class="notif-body-msg">Laudo técnico disponível para revisão</div>
+              <div class="notif-body-time">Ontem, 16:30</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pages" id="pages">
+
+        <div class="page active" id="page-home">
+          <div class="scroll-area" style="flex:1">
+            <div class="stat-row">
+              <div class="stat"><div class="stat-n">3</div><div class="stat-l">Abertas</div></div>
+              <div class="stat"><div class="stat-n">2</div><div class="stat-l">Em andamento</div></div>
+            </div>
+            <div class="section-lbl">Ordens recentes</div>
+            <div id="os-list"></div>
+          </div>
+          <button class="fab" onclick="goTo('create')" aria-label="Nova OS"><i class="ti ti-plus" aria-hidden="true"></i></button>
+          <div class="bottom-nav">
+            <button class="nav-btn active" onclick="setTab('home',this)"><i class="ti ti-clipboard-list" aria-hidden="true"></i><span>Início</span></button>
+            <button class="nav-btn" onclick="setTab('search',this)"><i class="ti ti-search" aria-hidden="true"></i><span>Buscar</span></button>
+            <button class="nav-btn" onclick="setTab('history',this)"><i class="ti ti-history" aria-hidden="true"></i><span>Histórico</span></button>
+            <button class="nav-btn" onclick="setTab('profile',this)"><i class="ti ti-user-circle" aria-hidden="true"></i><span>Perfil</span></button>
+          </div>
+        </div>
+
+        <div class="page" id="page-search">
+          <div class="scroll-area" style="flex:1">
+            <div class="form-group" style="margin-top:4px">
+              <div style="position:relative">
+                <i class="ti ti-search" aria-hidden="true" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px"></i>
+                <input class="form-input" id="searchInput" placeholder="Título, setor, equipamento…" oninput="renderSearch()" style="padding-left:34px">
+              </div>
+            </div>
+            <div id="search-results"><div class="empty-state"><i class="ti ti-search" aria-hidden="true"></i><p>Digite para buscar ordens de serviço</p></div></div>
+          </div>
+          <div class="bottom-nav">
+            <button class="nav-btn" onclick="setTab('home',this)"><i class="ti ti-clipboard-list" aria-hidden="true"></i><span>Início</span></button>
+            <button class="nav-btn active" onclick="setTab('search',this)"><i class="ti ti-search" aria-hidden="true"></i><span>Buscar</span></button>
+            <button class="nav-btn" onclick="setTab('history',this)"><i class="ti ti-history" aria-hidden="true"></i><span>Histórico</span></button>
+            <button class="nav-btn" onclick="setTab('profile',this)"><i class="ti ti-user-circle" aria-hidden="true"></i><span>Perfil</span></button>
+          </div>
+        </div>
+
+        <div class="page" id="page-history">
+          <div class="scroll-area" style="flex:1">
+            <div class="history-filter" id="histFilter">
+              <button class="fchip active" onclick="filterHistory('all',this)">Todas</button>
+              <button class="fchip" onclick="filterHistory('concluida',this)">Concluídas</button>
+              <button class="fchip" onclick="filterHistory('recusada',this)">Recusadas</button>
+              <button class="fchip" onclick="filterHistory('em_andamento',this)">Em andamento</button>
+            </div>
+            <div class="section-lbl" style="margin-top:0">Junho 2026</div>
+            <div id="timeline-list"></div>
+          </div>
+          <div class="bottom-nav">
+            <button class="nav-btn" onclick="setTab('home',this)"><i class="ti ti-clipboard-list" aria-hidden="true"></i><span>Início</span></button>
+            <button class="nav-btn" onclick="setTab('search',this)"><i class="ti ti-search" aria-hidden="true"></i><span>Buscar</span></button>
+            <button class="nav-btn active" onclick="setTab('history',this)"><i class="ti ti-history" aria-hidden="true"></i><span>Histórico</span></button>
+            <button class="nav-btn" onclick="setTab('profile',this)"><i class="ti ti-user-circle" aria-hidden="true"></i><span>Perfil</span></button>
+          </div>
+        </div>
+
+        <div class="page" id="page-profile">
+          <div class="scroll-area" style="flex:1">
+            <div style="display:flex;flex-direction:column;align-items:center;padding:24px 0 20px;gap:8px">
+              <div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#0C447C">CO</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text)">Carlos Operador</div>
+              <span class="pill pill-aberta">Operador de Planta</span>
+            </div>
+            <div class="detail-block">
+              <div class="detail-block-lbl">Informações</div>
+              <div class="detail-row"><span class="detail-key">Usuário</span><span class="detail-val">operador</span></div>
+              <div class="detail-row"><span class="detail-key">Turno</span><span class="detail-val">Manhã (06h–14h)</span></div>
+              <div class="detail-row"><span class="detail-key">Setor</span><span class="detail-val">Setor A / B</span></div>
+            </div>
+            <div class="detail-block">
+              <div class="detail-block-lbl">Atividade</div>
+              <div class="detail-row"><span class="detail-key">OS abertas</span><span class="detail-val">3</span></div>
+              <div class="detail-row"><span class="detail-key">OS concluídas (mês)</span><span class="detail-val">11</span></div>
+              <div class="detail-row"><span class="detail-key">Tempo médio</span><span class="detail-val">4h 12min</span></div>
+            </div>
+            <button class="btn btn-ghost" onclick="logout()" style="margin-top:8px"><i class="ti ti-logout" aria-hidden="true"></i>Sair da conta</button>
+          </div>
+          <div class="bottom-nav">
+            <button class="nav-btn" onclick="setTab('home',this)"><i class="ti ti-clipboard-list" aria-hidden="true"></i><span>Início</span></button>
+            <button class="nav-btn" onclick="setTab('search',this)"><i class="ti ti-search" aria-hidden="true"></i><span>Buscar</span></button>
+            <button class="nav-btn" onclick="setTab('history',this)"><i class="ti ti-history" aria-hidden="true"></i><span>Histórico</span></button>
+            <button class="nav-btn active" onclick="setTab('profile',this)"><i class="ti ti-user-circle" aria-hidden="true"></i><span>Perfil</span></button>
+          </div>
+        </div>
+
+        <div class="page" id="page-details">
+          <div class="sub-header">
+            <button class="back-btn" onclick="goBack()" aria-label="Voltar"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
+            <span class="sub-header-title" id="det-hdr">Detalhes da OS</span>
+          </div>
+          <div class="scroll-area" style="flex:1;padding-bottom:24px">
+            <div class="detail-block">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span id="det-id" style="font-size:12px;color:var(--text3);font-weight:500"></span>
+                <span id="det-pill" class="pill"></span>
+              </div>
+              <div id="det-title" style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:10px;line-height:1.35"></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap" id="det-tags"></div>
+            </div>
+            <div class="detail-block">
+              <div class="detail-block-lbl">Informações</div>
+              <div class="detail-row"><span class="detail-key">Equipamento</span><span class="detail-val" id="det-equip"></span></div>
+              <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val" id="det-status"></span></div>
+              <div class="detail-row"><span class="detail-key">Criada em</span><span class="detail-val" id="det-created"></span></div>
+              <div class="detail-row"><span class="detail-key">Técnico</span><span class="detail-val" id="det-tech"></span></div>
+            </div>
+            <div class="detail-block">
+              <div class="detail-block-lbl">Descrição</div>
+              <div id="det-desc" style="font-size:13px;color:var(--text);line-height:1.6"></div>
+            </div>
+            <div class="detail-block" id="det-materials-block" style="display:none">
+              <div class="detail-block-lbl">Materiais utilizados</div>
+              <div id="det-materials"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="page" id="page-create">
+          <div class="sub-header">
+            <button class="back-btn" onclick="goBack()" aria-label="Voltar"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
+            <span class="sub-header-title">Nova Ordem de Serviço</span>
+          </div>
+          <div class="scroll-area" style="flex:1;padding-bottom:24px">
+            <div class="form-group">
+              <label class="form-lbl">Título <span class="req">*</span></label>
+              <input class="form-input" id="f-title" placeholder="Descreva o problema brevemente">
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Descrição <span class="req">*</span></label>
+              <textarea class="form-textarea" id="f-desc" placeholder="Sintomas, contexto, horário…"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Setor <span class="req">*</span></label>
+              <select class="form-select" id="f-sector">
+                <option value="">Selecione um setor</option>
+                <option>Setor A – Prensas</option>
+                <option>Setor B – Compressores</option>
+                <option>Setor C – CNC</option>
+                <option>Setor D – Soldagem</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Equipamento <span class="req">*</span></label>
+              <input class="form-input" id="f-equip" placeholder="Ex: Prensa Hidráulica P-250">
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Prioridade <span class="req">*</span></label>
+              <select class="form-select" id="f-priority">
+                <option value="">Selecione</option>
+                <option value="Alta">Alta – Equipamento parado</option>
+                <option value="Média">Média – Funcionamento degradado</option>
+                <option value="Baixa">Baixa – Manutenção preventiva</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="submitOS()"><i class="ti ti-circle-check" aria-hidden="true"></i>Criar Ordem de Serviço</button>
+          </div>
+        </div>
+
+        <div class="page" id="page-login">
+          <div class="login-wrap">
+            <div class="login-logo"><i class="ti ti-leaf" aria-hidden="true"></i><span class="login-logo-text">Plant<span>OS</span></span></div>
+            <div class="login-sub">Sistema de Ordens de Serviço</div>
+            <div class="form-group">
+              <label class="form-lbl">Usuário <span class="req">*</span></label>
+              <input class="form-input" id="l-user" placeholder="Seu usuário" value="operador">
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Senha <span class="req">*</span></label>
+              <input class="form-input" id="l-pass" type="password" placeholder="Mínimo 6 caracteres" value="123456">
+            </div>
+            <button class="btn btn-primary" onclick="doLogin()" style="margin-top:4px"><i class="ti ti-login" aria-hidden="true"></i>Entrar</button>
+            <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--text3)">Esqueceu sua senha? <a href="#" style="color:var(--primary);text-decoration:none;font-weight:500">Recuperar</a></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const OS_DATA=[
+  {id:'2026-0001',title:'Falha no motor da prensa hidráulica',status:'aberta',sector:'Setor A',equipment:'Prensa Hidráulica P-250',priority:'Alta',desc:'Motor não está respondendo a comandos. Máquina com atividade normal até ontem às 18h.',created:'15/06/2026 14:30',technician:null,materials:[],inHistory:false},
+  {id:'2026-0002',title:'Manutenção preventiva – Compressor',status:'aceita',sector:'Setor B',equipment:'Compressor Atlas Copco',priority:'Média',desc:'Manutenção preventiva conforme cronograma. Verificar filtros, óleo e limpeza geral.',created:'15/06/2026 12:15',technician:'João Silva',materials:[],inHistory:false},
+  {id:'2026-0003',title:'Troca de correias – Máquina CNC',status:'em_andamento',sector:'Setor C',equipment:'Máquina CNC Fanuc',priority:'Baixa',desc:'Ruído anormal nas correias de transmissão. Técnico em andamento.',created:'15/06/2026 11:00',technician:'Maria Santos',materials:[{name:'Correia de transmissão 50mm',qty:'2 un.'},{name:'Óleo ISO 32',qty:'1 L'}],inHistory:false},
+  {id:'2026-0004',title:'Substituição de rolamento – Torno CNC',status:'concluida',sector:'Setor C',equipment:'Torno CNC Romi',priority:'Média',desc:'Rolamento do eixo principal substituído com sucesso.',created:'13/06/2026 08:00',technician:'Ana Costa',materials:[{name:'Rolamento 6205-2RS',qty:'2 un.'}],inHistory:true},
+  {id:'2026-0005',title:'Falha elétrica – Painel de controle',status:'concluida',sector:'Setor D',equipment:'Painel Siemens S7',priority:'Alta',desc:'Fusível queimado substituído. Sistema restabelecido.',created:'10/06/2026 15:45',technician:'Pedro Alves',materials:[{name:'Fusível 16A',qty:'3 un.'}],inHistory:true},
+  {id:'2026-0006',title:'Ajuste de pressão – Compressor secundário',status:'recusada',sector:'Setor B',equipment:'Compressor Schulz',priority:'Baixa',desc:'OS recusada: equipamento fora do escopo do contrato vigente.',created:'08/06/2026 10:30',technician:null,materials:[],inHistory:true},
+];
+
+const statusLabel={aberta:'Aberta',aceita:'Aceita',em_andamento:'Em andamento',concluida:'Concluída',recusada:'Recusada'};
+const pillClass={aberta:'pill-aberta',aceita:'pill-aceita',em_andamento:'pill-andamento',concluida:'pill-concluida',recusada:'pill-recusada'};
+const pClass={Alta:'p-alta',Média:'p-media',Baixa:'p-baixa'};
+
+let currentPage='home',prevPage='home',histFilterVal='all';
+
+function goTo(page,data){
+  prevPage=currentPage;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  currentPage=page;
+  if(page==='details'&&data) renderDetails(data);
+  closeNotifPanel();
+}
+function goBack(){goTo(prevPage)}
+
+function setTab(tab,btn){
+  goTo(tab);
+  const nav=btn.closest('.bottom-nav');
+  if(nav) nav.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function osCard(os,compact){
+  return `<div class="os-card ${pClass[os.priority]||''}" onclick="openDetails('${os.id}')">
+    <div class="os-card-top"><span class="os-num">OS #${os.id}</span><span class="pill ${pillClass[os.status]||''}">${statusLabel[os.status]||os.status}</span></div>
+    <div class="os-title">${os.title}</div>
+    <div class="os-meta">
+      <span><i class="ti ti-map-pin" aria-hidden="true"></i>${os.sector}</span>
+      <span><i class="ti ti-flag" aria-hidden="true"></i>${os.priority}</span>
+      ${os.technician?`<span><i class="ti ti-tool" aria-hidden="true"></i>${os.technician}</span>`:''}
+    </div>
+    ${!compact?`<div class="os-footer"><span>${os.created}</span><span>${os.equipment}</span></div>`:''}
+  </div>`;
+}
+
+function renderHome(){
+  document.getElementById('os-list').innerHTML=OS_DATA.filter(o=>!o.inHistory).map(o=>osCard(o)).join('');
+}
+function renderSearch(){
+  const q=document.getElementById('searchInput').value.toLowerCase().trim();
+  const el=document.getElementById('search-results');
+  if(!q){el.innerHTML='<div class="empty-state"><i class="ti ti-search" aria-hidden="true"></i><p>Digite para buscar ordens de serviço</p></div>';return;}
+  const res=OS_DATA.filter(o=>o.title.toLowerCase().includes(q)||o.sector.toLowerCase().includes(q)||o.equipment.toLowerCase().includes(q)||o.id.includes(q));
+  el.innerHTML=res.length?res.map(o=>osCard(o,true)).join(''):`<div class="empty-state"><i class="ti ti-mood-empty" aria-hidden="true"></i><p>Nenhuma OS encontrada para "${q}"</p></div>`;
+}
+
+function filterHistory(f,btn){
+  histFilterVal=f;
+  document.querySelectorAll('#histFilter .fchip').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHistory();
+}
+
+const tlIcon={concluida:'ti-circle-check',recusada:'ti-circle-x',em_andamento:'ti-loader'};
+const tlClass={concluida:'done',recusada:'refused',em_andamento:'progress'};
+
+function renderHistory(){
+  const data=OS_DATA.filter(o=>histFilterVal==='all'?true:o.status===histFilterVal);
+  const el=document.getElementById('timeline-list');
+  if(!data.length){el.innerHTML='<div class="empty-state"><i class="ti ti-history" aria-hidden="true"></i><p>Nenhuma OS neste filtro</p></div>';return;}
+  el.innerHTML=data.map((o,i)=>`
+    <div class="timeline-item" onclick="openDetails('${o.id}')">
+      <div class="tl-line">
+        <div class="tl-dot ${tlClass[o.status]||'done'}"><i class="ti ${tlIcon[o.status]||'ti-circle-check'}" aria-hidden="true"></i></div>
+        ${i<data.length-1?'<div class="tl-connector"></div>':''}
+      </div>
+      <div class="tl-content">
+        <div class="tl-title">${o.title}</div>
+        <div class="tl-sub">${o.sector} · ${o.equipment}</div>
+        <div class="tl-date">${o.created}${o.technician?' · '+o.technician:''}</div>
+        <span class="pill ${pillClass[o.status]||''}" style="margin-top:6px;display:inline-flex">${statusLabel[o.status]}</span>
+      </div>
+    </div>`).join('');
+}
+
+function openDetails(id){
+  const os=OS_DATA.find(o=>o.id===id);
+  goTo('details',os);
+}
+function renderDetails(os){
+  document.getElementById('det-hdr').textContent='OS #'+os.id;
+  document.getElementById('det-id').textContent='OS #'+os.id;
+  document.getElementById('det-title').textContent=os.title;
+  const pill=document.getElementById('det-pill');
+  pill.textContent=statusLabel[os.status];pill.className='pill '+(pillClass[os.status]||'');
+  const pColors={Alta:'pill-recusada',Média:'pill-andamento',Baixa:'pill-aceita'};
+  document.getElementById('det-tags').innerHTML=`<span class="pill pill-aberta">${os.sector}</span><span class="pill ${pColors[os.priority]||''}">${os.priority}</span>`;
+  document.getElementById('det-equip').textContent=os.equipment;
+  document.getElementById('det-status').textContent=statusLabel[os.status];
+  document.getElementById('det-created').textContent=os.created;
+  document.getElementById('det-tech').textContent=os.technician||'—';
+  document.getElementById('det-desc').textContent=os.desc;
+  const mb=document.getElementById('det-materials-block');
+  if(os.materials.length){
+    mb.style.display='block';
+    document.getElementById('det-materials').innerHTML=os.materials.map(m=>`<div class="detail-row"><span class="detail-key">${m.name}</span><span class="detail-val">${m.qty}</span></div>`).join('');
+  }else{mb.style.display='none';}
+}
+
+function toggleNotifPanel(){
+  const panel=document.getElementById('notifPanel');
+  const ov=document.getElementById('overlay');
+  const isOpen=panel.classList.contains('open');
+  if(isOpen){closeNotifPanel();}else{panel.classList.add('open');ov.classList.add('active');}
+}
+function closeNotifPanel(){
+  document.getElementById('notifPanel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('active');
+}
+function clearNotifs(){
+  document.getElementById('notifList').innerHTML='<div class="empty-state" style="padding:20px"><i class="ti ti-bell-off" aria-hidden="true"></i><p>Nenhuma notificação</p></div>';
+  document.getElementById('notifBadge').style.display='none';
+  closeNotifPanel();
+}
+
+function doLogin(){
+  const u=document.getElementById('l-user').value.trim();
+  const p=document.getElementById('l-pass').value.trim();
+  if(!u||p.length<6){alert('Usuário e senha (mín. 6 caracteres) são obrigatórios.');return;}
+  goTo('home');
+}
+function logout(){closeNotifPanel();goTo('login');}
+
+function submitOS(){
+  const t=document.getElementById('f-title').value.trim();
+  const d=document.getElementById('f-desc').value.trim();
+  const s=document.getElementById('f-sector').value;
+  const e=document.getElementById('f-equip').value.trim();
+  const p=document.getElementById('f-priority').value;
+  if(!t||!d||!s||!e||!p){alert('Preencha todos os campos obrigatórios.');return;}
+  const now=new Date();
+  const ds=`${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const newId=`2026-00${String(OS_DATA.length+1).padStart(2,'0')}`;
+  OS_DATA.unshift({id:newId,title:t,status:'aberta',sector:s.split('–')[0].trim(),equipment:e,priority:p,desc:d,created:ds,technician:null,materials:[],inHistory:false});
+  ['f-title','f-desc','f-equip'].forEach(id=>document.getElementById(id).value='');
+  ['f-sector','f-priority'].forEach(id=>document.getElementById(id).value='');
+  renderHome();
+  goTo('home');
+}
+
+renderHome();
+renderHistory();
+</script>
