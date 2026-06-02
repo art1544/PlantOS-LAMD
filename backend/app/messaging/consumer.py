@@ -4,6 +4,7 @@ import json
 import os
 import signal
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -109,9 +110,10 @@ def run(max_messages: int | None = None) -> int:
         except Exception:
             pass
 
-    signal.signal(signal.SIGINT, _shutdown)
-    if hasattr(signal, 'SIGTERM'):
-        signal.signal(signal.SIGTERM, _shutdown)
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGINT, _shutdown)
+        if hasattr(signal, 'SIGTERM'):
+            signal.signal(signal.SIGTERM, _shutdown)
 
     try:
         channel.start_consuming()
